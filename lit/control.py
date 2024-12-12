@@ -177,6 +177,7 @@ def steer(args, decoder_model, tokenizer, **kwargs):
     torch.backends.cudnn.deterministic = True
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
+    assert args.qa_per_layer is False
 
     target_model = get_target_model(args, device=kwargs["device"])
     module_read, module_write = get_modules(target_model, decoder_model, **vars(args))
@@ -187,7 +188,7 @@ def steer(args, decoder_model, tokenizer, **kwargs):
     for i in tqdm(range(len(dataset) // args.batch_size)):
         batch = dataset[i * args.batch_size : (i + 1) * args.batch_size]
         tokenized_batch = tokenize(
-            batch,
+            [item[0] for item in batch],
             tokenizer,
             name=args.target_model_name,
             generate=False,

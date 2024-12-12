@@ -93,10 +93,10 @@ python3 -m lit.control \
     --dataset dolly \
     --eval_prompts default \
     --samples 35 \
-    --per_layer_control
+    --per_layer_loss
 ```
 
-Play around with the number of samples in order to get a cogent, well-steered response. We find around 30-60 samples works best. Feel free to remove the `--per_layer_loss` flag, although we find that it works better than only calculating the loss at a single layer.
+Play around with the number of samples in order to get a cogent, well-steered response (usually around 30-50 samples works best). Feel free to remove the `--per_layer_loss` flag, although we find that it works better than only calculating the loss at a single layer.
 
 ## :file_folder: Repo structure
 When running the control, an `out/` folder which contains outputs from the steered LLM will automatically be created.
