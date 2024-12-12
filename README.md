@@ -1,5 +1,5 @@
 # :thought_balloon: LatentQA
-This project contains the code to train and run the decoder LLM described in the paper [LatentQA: Teaching LLMs to Decode Activations Into Natural Language](). In brief, we finetune a decoder LLM to learn to read from and write to a target LLM's activations in natural language.
+This project contains the code to train and run the decoder LLM described in the paper [LatentQA: Teaching LLMs to Decode Activations Into Natural Language](https://drive.google.com/file/d/1aQwpyNG39yDXwZYsZpW7WI6tqbzXvCj-/view?usp=sharing). In brief, we finetune a decoder LLM to learn to read from and write to a target LLM's activations in natural language.
 
 For more details, see the [project page](https://latentqa.github.io).
 
@@ -26,7 +26,7 @@ Please set the output directory and any other default variables in `lit/configs/
 For DDP, run:
 ```
 torchrun --nnodes 1 --nproc-per-node $NUM_GPUS -m lit.train \
-    --decoder_model_name meta-llama/Meta-Llama-3-8B-Instruct \
+    --target_model_name meta-llama/Meta-Llama-3-8B-Instruct \
     --train_stimulus_completion data/train/stimulus_completion.json \
     --train_stimulus data/train/stimulus.json \
     --train_control data/train/control.json \
@@ -39,12 +39,12 @@ torchrun --nnodes 1 --nproc-per-node $NUM_GPUS -m lit.train \
 FSDP was tested on 8x A100-80GB cards. For FSDP, run:
 ```
 torchrun --nnodes 1 --nproc-per-node 8 -m lit.train \
-    --decoder_model_name meta-llama/Meta-Llama-3-70B-Instruct \
+    --target_model_name meta-llama/Meta-Llama-3-70B-Instruct \
     --train_stimulus_completion data/train/stimulus_completion.json \
     --train_stimulus data/train/stimulus.json \
     --train_control data/train/control.json \
     --train_qa data/train/qa.json \
-    --gradient_accumulation_steps 16 \ 
+    --gradient_accumulation_steps 16 \
     --min_layer_to_read 21 \
     --max_layer_read 22 \
     --nudge_persona \
@@ -59,13 +59,13 @@ If you wish to perform evaluation while training, add the following arguments (o
     --eval_stimulus data/eval/stimulus.json \
     --eval_control data/eval/control.json \
     --eval_qa data/eval/qa.json \
-    --val_every_n_steps 1000
+    --eval_every_n_steps 1000
 ```
 
 ## :mag: Reading
 The code for reading in `lit/reading.py` is currently set up to generate QA-pairs for control. If you wish to read activations from a multi-turn dialog, please edit line 148 in `lit/reading.py` to be a `List[List[Str]]` of the format `[[user, model, ...], [user, model, ...], ...]`, i.e., a list of dialogs.
 
-Additionally, you will likely want to modify the questions given to the decoder, so please edit line in `lit/reading.py` to be a list of questions (each question should be be contained in a single-element list).
+Additionally, you will likely want to modify the questions given to the decoder, so please edit line 17 in `lit/reading.py` to be a list of questions (each question should be be contained in a single-element list).
 
 Then run: 
 ```

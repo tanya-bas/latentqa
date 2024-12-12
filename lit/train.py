@@ -169,9 +169,7 @@ def main(**kwargs):
                 f"Training Epoch: {epoch+1}/{args.num_epochs}, batch {step+1}/{len(train_dataloader)} completed (loss: {loss.detach().float()})"
             )
 
-            if args.eval_ppl and (
-                (train_steps + 1) % args.val_every_n_steps == 0 or train_steps == 0
-            ):
+            if args.eval_ppl and train_steps % args.eval_every_n_steps == 0:
                 assert eval_dataloader is not None
                 total_loss = 0.0
                 pbar = tqdm(

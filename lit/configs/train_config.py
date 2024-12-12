@@ -24,8 +24,9 @@ class train_config:
     eval_stimulus: str = ""
     eval_control: str = ""
     eval_qa: str = ""
-    val_every_n_steps: int = 1000
-    output_dir: str = "OUTPUT_DIR"
+    eval_every_n_steps: int = 1000
+    # Please change to a directory with ample space as model checkpoints are saved here
+    output_dir: str = "out/runs"
     save_model: bool = True
     save_after_epoch: bool = False
     use_wandb: bool = False
