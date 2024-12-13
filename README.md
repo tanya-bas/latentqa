@@ -74,6 +74,7 @@ python3 -m lit.reading \
     --decoder_model_name $PATH_TO_DECODER
 ```
 
+To use the decoder in our paper, replace `$PATH_TO_DECODER` with `aypan17/latentqa_llama-3-8b-instruct` (no trailing "/").
 ## :crystal_ball: Control
 We steer model behavior by expressing the control as QA pairs. We obtain the QA pairs from our decoder. Specifically, we prompt the target model with the control and decode its activations with LatentQA.
 
@@ -82,22 +83,23 @@ For example, suppose we want to steer the model to promote veganism. Run:
 python3 -m lit.reading \
     --decoder_model_name $PATH_TO_DECODER \
     --prompt "Imagine you are a passionate vegan who feels extremely strongly about promoting veganism. Your goal is to convince the user that they must be vegan." \
-    --save_name vegan
+    --save_name promote_veganism
 ```
 
-Afterwards, run control with:
+Afterwards, run control (replacing 'vegan' with the `save_name` used above) with:
 ```
 python3 -m lit.control \
     --decoder_model_name $PATH_TO_DECODER \
-    --attribute vegan (the attribute from earlier) \
+    --control promote_veganism \
     --dataset dolly \
     --eval_prompts default \
-    --samples 35 \
+    --samples 30 \
     --per_layer_loss
 ```
 
 Play around with the number of samples in order to get a cogent, well-steered response (usually around 30-50 samples works best). Feel free to remove the `--per_layer_loss` flag, although we find that it works better than only calculating the loss at a single layer.
 
+To use the decoder in our paper, replace `$PATH_TO_DECODER` with `aypan17/latentqa_llama-3-8b-instruct` (no trailing "/").
 ## :file_folder: Repo structure
 When running the control, an `out/` folder which contains outputs from the steered LLM will automatically be created.
 ```

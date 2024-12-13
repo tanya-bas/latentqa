@@ -31,12 +31,12 @@ def get_dataset(args, tokenizer, qa_per_layer=False):
     if qa_per_layer:
         QA_DATA = {i: None for i in args.layers_to_optimize}
         for i in args.layers_to_optimize:
-            with open(f"controls/{args.attribute}_layer{i}.json", "r") as f:
+            with open(f"controls/{args.control}_layer{i}.json", "r") as f:
                 QA_DATA[i] = list(json.load(f).values())[0]
         num_qa = min([len(qa) for qa in QA_DATA.values()])
         assert num_qa == max([len(qa) for qa in QA_DATA.values()])
     else:
-        with open(f"controls/{args.attribute}.json", "r") as f:
+        with open(f"controls/{args.control}.json", "r") as f:
             QA_DATA = list(json.load(f).values())[0]
         num_qa = len(QA_DATA)
     data = []
@@ -130,7 +130,7 @@ def get_results(args, model, tokenizer):
     model.eval()
     completions = []
     if args.save_model:
-        FOLDER = f"out/model/steer_{args.attribute}_{args.dataset}_{args.samples}"
+        FOLDER = f"out/model/steer_{args.control}_{args.dataset}_{args.samples}"
         if not os.path.exists(FOLDER):
             os.makedirs(FOLDER)
         model.save_pretrained(FOLDER)
@@ -164,7 +164,7 @@ def get_results(args, model, tokenizer):
             print("#" * 80)
             completions.append(completion)
         FOLDER = (
-            f"out/completions/{args.attribute}_{args.dataset}_samples{args.samples}"
+            f"out/completions/{args.control}_{args.dataset}_samples{args.samples}"
         )
         if not os.path.exists(FOLDER):
             os.makedirs(FOLDER)

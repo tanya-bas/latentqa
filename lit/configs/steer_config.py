@@ -28,7 +28,7 @@ class PeftConfig:
 class steer_config:
     decoder_model_name: str = ""
     target_model_name: str = "meta-llama/Meta-Llama-3-8B-Instruct"
-    attribute: str = ""
+    control: str = ""
     dataset: str = ""
     peft_config: PeftConfig = field(default_factory=PeftConfig)
     lora_modules: str = "both"
