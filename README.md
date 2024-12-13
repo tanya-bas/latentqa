@@ -1,5 +1,5 @@
 # :thought_balloon: LatentQA
-This project contains the code to train and run the decoder LLM described in the paper [LatentQA: Teaching LLMs to Decode Activations Into Natural Language](https://drive.google.com/file/d/1aQwpyNG39yDXwZYsZpW7WI6tqbzXvCj-/view?usp=sharing). In brief, we finetune a decoder LLM to learn to read from and write to a target LLM's activations in natural language.
+This project contains the code to train and run the decoder LLM described in the paper [LatentQA: Teaching LLMs to Decode Activations Into Natural Language](https://arxiv.org/abs/2412.08686). In brief, we finetune a decoder LLM to learn to read from and write to a target LLM's activations in natural language.
 
 For more details, see the [project page](https://latentqa.github.io).
 
