@@ -1,16 +1,16 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # This software may be used and distributed according to the terms of the Llama 2 Community License Agreement.
 
-from dataclasses import dataclass
-from typing import ClassVar, List
+from dataclasses import dataclass, field
+from typing import List
 
 
 @dataclass
 class lora_config:
     r: int = 16
     lora_alpha: int = 32
-    target_modules: ClassVar[List[str]] = (
-        [
+    target_modules: List[str] = field(
+        default_factory=lambda: [
             "q_proj",
             "k_proj",
             "v_proj",
@@ -19,7 +19,7 @@ class lora_config:
             "up_proj",
             "down_proj",
             "lm_head",
-        ],
+        ]
     )
     bias = "none"
     task_type: str = "CAUSAL_LM"
