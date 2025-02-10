@@ -70,7 +70,7 @@ def main(**kwargs):
 
     # Load the models
     target_model = get_model(
-        args.target_model_name, fsdp_args=fsdp_args, device=device, rank=rank
+        args.target_model_name, tokenizer, fsdp_args=fsdp_args, device=device, rank=rank
     )
     lora_params = {
         k.name: getattr(lora_config(), k.name) for k in fields(lora_config())
@@ -78,6 +78,7 @@ def main(**kwargs):
     peft_config = LoraConfig(**lora_params)
     decoder_model = get_model(
         args.target_model_name,
+        tokenizer,
         peft_config=peft_config,
         fsdp_args=fsdp_args,
         device=device,

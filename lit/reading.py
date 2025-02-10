@@ -138,11 +138,12 @@ def main(**kwargs):
     update_config(args, **kwargs)
     tokenizer = get_tokenizer(args.target_model_name)
     decoder_model = get_model(
-        model_name=args.target_model_name,
+        args.target_model_name,
+        tokenizer,
         load_peft_checkpoint=args.decoder_model_name,
         device="cuda:1",
     )
-    target_model = get_model(args.target_model_name, device="cuda:0")
+    target_model = get_model(args.target_model_name, tokenizer, device="cuda:0")
     dialogs = [[args.prompt]]
     questions = QUESTIONS
     interpret(target_model, decoder_model, tokenizer, dialogs, questions, args)

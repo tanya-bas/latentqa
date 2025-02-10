@@ -113,7 +113,7 @@ def get_dataset(args, tokenizer, qa_per_layer=False):
     return formatted_data
 
 
-def get_target_model(args, device):
+def get_target_model(args, tokenizer, device):
     lora_params = {
         k.name: getattr(args.peft_config, k.name) for k in fields(args.peft_config)
     }
@@ -121,7 +121,7 @@ def get_target_model(args, device):
     lora_params["layers_to_transform"] = args.layers_to_optimize
     peft_config = LoraConfig(**lora_params)
     target_model = get_model(
-        args.target_model_name, peft_config=peft_config, device=device
+        args.target_model_name, tokenizer, peft_config=peft_config, device=device
     )
     return target_model
 
@@ -179,7 +179,7 @@ def steer(args, decoder_model, tokenizer, **kwargs):
     np.random.seed(args.seed)
     assert args.qa_per_layer is False
 
-    target_model = get_target_model(args, device=kwargs["device"])
+    target_model = get_target_model(args, tokenizer, device=kwargs["device"])
     module_read, module_write = get_modules(target_model, decoder_model, **vars(args))
     optimizer = torch.optim.Adam(target_model.parameters(), lr=args.lr)
     dataset = get_dataset(args, tokenizer)
@@ -222,7 +222,7 @@ def per_layer_loss(args, decoder_model, tokenizer, **kwargs):
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
-    target_model = get_target_model(args, device=kwargs["device"])
+    target_model = get_target_model(args, tokenizer, device=kwargs["device"])
     module_write = [eval("decoder_model.model.model.layers[0]")]
     l_to_optimizer = {
         layer: torch.optim.Adam(

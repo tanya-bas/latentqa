@@ -221,6 +221,8 @@ def get_tokenizer(model_name):
         model_name, padding_side="left", add_eos_token=True
     )
     tokenizer.pad_token_id = PAD_TOKEN_IDS[model_name]
+    if "distill-qwen" in model_name.lower():
+        tokenizer.add_tokens(["<|reserved_special_token_8|>"])
     return tokenizer
 
 
@@ -252,6 +254,7 @@ def fsdp_auto_wrap_policy(model, transformer_layer_name):
 
 def get_model(
     model_name,
+    tokenizer,
     peft_config=None,
     load_peft_checkpoint=None,
     fsdp_args=None,
@@ -296,6 +299,7 @@ def get_model(
             use_cache=None,
             device_map="auto" if device == "auto" else None,
         )
+    model.resize_token_embeddings(len(tokenizer))
     for _, param in model.named_parameters():
         param.requires_grad = False
 
