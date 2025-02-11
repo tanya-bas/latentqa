@@ -12,6 +12,7 @@ class train_config:
     train_control: str = ""
     train_qa: str = ""
     train_with_verb_mask: Optional[str] = "user"
+    add_thought_tokens: bool = False
     # Adds a nudge 'Follow the instructions' to make the model more faithful to the control
     nudge_persona: bool = False  
     modify_chat_template: bool = True

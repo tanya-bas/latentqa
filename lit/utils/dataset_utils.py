@@ -18,6 +18,8 @@ NUM_READ_TOKENS_TO_SHIFT = {
     "meta-llama/Meta-Llama-3-8B-Instruct": 1,
     "meta-llama/Meta-Llama-3-70B-Instruct": 1,
     "mistralai/Ministral-8B-Instruct-2410": 2,
+    "deepseek-ai/DeepSeek-R1-Distill-Llama-8B": 2,
+    "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B": 2,
 }
 
 # Magic numbers that are the length of the user tag + BOS token
@@ -25,12 +27,16 @@ NUM_WRITE_TOKENS_TO_SHIFT = {
     "meta-llama/Meta-Llama-3-8B-Instruct": 5,
     "meta-llama/Meta-Llama-3-70B-Instruct": 5,
     "mistralai/Ministral-8B-Instruct-2410": 2,
+    "deepseek-ai/DeepSeek-R1-Distill-Llama-8B": 2,
+    "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B": 2,
 }
 
 PAD_TOKEN_IDS = {
     "meta-llama/Meta-Llama-3-8B-Instruct": 128010,
     "meta-llama/Meta-Llama-3-70B-Instruct": 128010,
     "mistralai/Ministral-8B-Instruct-2410": 999,
+    "deepseek-ai/DeepSeek-R1-Distill-Llama-8B": 128010,
+    "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B": 151643,
 }
 
 # Magic numbers that correspond to the token idxs of the chat format for the models
@@ -50,12 +56,28 @@ CHAT_FORMAT_TOKENS = {
         torch.tensor([4]),
         torch.tensor([4]),
     ),
+    "deepseek-ai/DeepSeek-R1-Distill-Llama-8B": (
+        torch.tensor([128011]),
+        torch.tensor([128012]),
+        torch.tensor([128016]),
+    ),
+    "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B": (
+        torch.tensor([151644]),
+        torch.tensor([151645]),
+        torch.tensor([151665]),
+    ),
 }
 
-# Mistral should not pass the option --modify_chat_template
+# Reasoning models need to encode their thought tokens
+ENCODER_CHAT_TEMPLATES = {
+    "deepseek-ai/DeepSeek-R1-Distill-Llama-8B": "{% if not add_generation_prompt is defined %}{% set add_generation_prompt = false %}{% endif %}{% set ns = namespace(is_first=false, is_tool=false, is_output_first=true, system_prompt='') %}{%- for message in messages %}{%- if message['role'] == 'system' %}{% set ns.system_prompt = message['content'] %}{%- endif %}{%- endfor %}{{bos_token}}{{ns.system_prompt}}{%- for message in messages %}{%- if message['role'] == 'user' %}{%- set ns.is_tool = false -%}{{'<｜User｜>' + message['content']}}{%- endif %}{%- if message['role'] == 'assistant' and message['content'] is none %}{%- set ns.is_tool = false -%}{%- for tool in message['tool_calls']%}{%- if not ns.is_first %}{{'<｜Assistant｜><｜tool▁calls▁begin｜><｜tool▁call▁begin｜>' + tool['type'] + '<｜tool▁sep｜>' + tool['function']['name'] + '\\n' + '```json' + '\\n' + tool['function']['arguments'] + '\\n' + '```' + '<｜tool▁call▁end｜>'}}{%- set ns.is_first = true -%}{%- else %}{{'\\n' + '<｜tool▁call▁begin｜>' + tool['type'] + '<｜tool▁sep｜>' + tool['function']['name'] + '\\n' + '```json' + '\\n' + tool['function']['arguments'] + '\\n' + '```' + '<｜tool▁call▁end｜>'}}{{'<｜tool▁calls▁end｜><｜end▁of▁sentence｜>'}}{%- endif %}{%- endfor %}{%- endif %}{%- if message['role'] == 'assistant' and message['content'] is not none %}{%- if ns.is_tool %}{{'<｜tool▁outputs▁end｜>' + message['content'] + '<｜end▁of▁sentence｜>'}}{%- set ns.is_tool = false -%}{%- else %}{% set content = message['content'] %}{{'<｜Assistant｜>' + content + '<｜end▁of▁sentence｜>'}}{%- endif %}{%- endif %}{%- if message['role'] == 'tool' %}{%- set ns.is_tool = true -%}{%- if ns.is_output_first %}{{'<｜tool▁outputs▁begin｜><｜tool▁output▁begin｜>' + message['content'] + '<｜tool▁output▁end｜>'}}{%- set ns.is_output_first = false %}{%- else %}{{'\\n<｜tool▁output▁begin｜>' + message['content'] + '<｜tool▁output▁end｜>'}}{%- endif %}{%- endif %}{%- endfor -%}{% if ns.is_tool %}{{'<｜tool▁outputs▁end｜>'}}{% endif %}{% if add_generation_prompt and not ns.is_tool %}{{'<｜Assistant｜><think>\\n'}}{% endif %}",
+    "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B": "{% if not add_generation_prompt is defined %}{% set add_generation_prompt = false %}{% endif %}{% set ns = namespace(is_first=false, is_tool=false, is_output_first=true, system_prompt='') %}{%- for message in messages %}{%- if message['role'] == 'system' %}{% set ns.system_prompt = message['content'] %}{%- endif %}{%- endfor %}{{bos_token}}{{ns.system_prompt}}{%- for message in messages %}{%- if message['role'] == 'user' %}{%- set ns.is_tool = false -%}{{'<｜User｜>' + message['content']}}{%- endif %}{%- if message['role'] == 'assistant' and message['content'] is none %}{%- set ns.is_tool = false -%}{%- for tool in message['tool_calls']%}{%- if not ns.is_first %}{{'<｜Assistant｜><｜tool▁calls▁begin｜><｜tool▁call▁begin｜>' + tool['type'] + '<｜tool▁sep｜>' + tool['function']['name'] + '\\n' + '```json' + '\\n' + tool['function']['arguments'] + '\\n' + '```' + '<｜tool▁call▁end｜>'}}{%- set ns.is_first = true -%}{%- else %}{{'\\n' + '<｜tool▁call▁begin｜>' + tool['type'] + '<｜tool▁sep｜>' + tool['function']['name'] + '\\n' + '```json' + '\\n' + tool['function']['arguments'] + '\\n' + '```' + '<｜tool▁call▁end｜>'}}{{'<｜tool▁calls▁end｜><｜end▁of▁sentence｜>'}}{%- endif %}{%- endfor %}{%- endif %}{%- if message['role'] == 'assistant' and message['content'] is not none %}{%- if ns.is_tool %}{{'<｜tool▁outputs▁end｜>' + message['content'] + '<｜end▁of▁sentence｜>'}}{%- set ns.is_tool = false -%}{%- else %}{% set content = message['content'] %}{{'<｜Assistant｜>' + content + '<｜end▁of▁sentence｜>'}}{%- endif %}{%- endif %}{%- if message['role'] == 'tool' %}{%- set ns.is_tool = true -%}{%- if ns.is_output_first %}{{'<｜tool▁outputs▁begin｜><｜tool▁output▁begin｜>' + message['content'] + '<｜tool▁output▁end｜>'}}{%- set ns.is_output_first = false %}{%- else %}{{'\\n<｜tool▁output▁begin｜>' + message['content'] + '<｜tool▁output▁end｜>'}}{%- endif %}{%- endif %}{%- endfor -%}{% if ns.is_tool %}{{'<｜tool▁outputs▁end｜>'}}{% endif %}{% if add_generation_prompt and not ns.is_tool %}{{'<｜Assistant｜><think>\\n'}}{% endif %}",
+}
 DECODER_CHAT_TEMPLATES = {
     "meta-llama/Meta-Llama-3-8B-Instruct": "{% set loop_messages = messages %}{% for message in loop_messages %}{% set role = message['role'] %}{% if role == 'assistant' %}{% set role = 'reflect' %}{% endif %}{% set content = '<|start_header_id|>' + role + '<|end_header_id|>\n\n' + message['content'] | trim + '<|eot_id|>' %}{% if loop.index0 == 0 %}{% set content = bos_token + content %}{% endif %}{{ content }}{% endfor %}{% if add_generation_prompt %}{{ '<|start_header_id|>reflect<|end_header_id|>\n\n' }}{% endif %}",
     "meta-llama/Meta-Llama-3-70B-Instruct": "{% set loop_messages = messages %}{% for message in loop_messages %}{% set role = message['role'] %}{% if role == 'assistant' %}{% set role = 'reflect' %}{% endif %}{% set content = '<|start_header_id|>' + role + '<|end_header_id|>\n\n' + message['content'] | trim + '<|eot_id|>' %}{% if loop.index0 == 0 %}{% set content = bos_token + content %}{% endif %}{{ content }}{% endfor %}{% if add_generation_prompt %}{{ '<|start_header_id|>reflect<|end_header_id|>\n\n' }}{% endif %}",
+    "deepseek-ai/DeepSeek-R1-Distill-Llama-8B": "{% if not add_generation_prompt is defined %}{% set add_generation_prompt = false %}{% endif %}{% set ns = namespace(is_first=false, is_tool=false, is_output_first=true, system_prompt='') %}{%- for message in messages %}{%- if message['role'] == 'system' %}{% set ns.system_prompt = message['content'] %}{%- endif %}{%- endfor %}{{bos_token}}{{ns.system_prompt}}{%- for message in messages %}{%- if message['role'] == 'user' %}{%- set ns.is_tool = false -%}{{'<｜User｜>' + message['content']}}{%- endif %}{%- if message['role'] == 'assistant' and message['content'] is none %}{%- set ns.is_tool = false -%}{%- for tool in message['tool_calls']%}{%- if not ns.is_first %}{{'<|reserved_special_token_8|><｜tool▁calls▁begin｜><｜tool▁call▁begin｜>' + tool['type'] + '<｜tool▁sep｜>' + tool['function']['name'] + '\\n' + '```json' + '\\n' + tool['function']['arguments'] + '\\n' + '```' + '<｜tool▁call▁end｜>'}}{%- set ns.is_first = true -%}{%- else %}{{'\\n' + '<｜tool▁call▁begin｜>' + tool['type'] + '<｜tool▁sep｜>' + tool['function']['name'] + '\\n' + '```json' + '\\n' + tool['function']['arguments'] + '\\n' + '```' + '<｜tool▁call▁end｜>'}}{{'<｜tool▁calls▁end｜><｜end▁of▁sentence｜>'}}{%- endif %}{%- endfor %}{%- endif %}{%- if message['role'] == 'assistant' and message['content'] is not none %}{%- if ns.is_tool %}{{'<｜tool▁outputs▁end｜>' + message['content'] + '<｜end▁of▁sentence｜>'}}{%- set ns.is_tool = false -%}{%- else %}{% set content = message['content'] %}{% if '</think>' in content %}{% set content = content.split('</think>')[-1] %}{% endif %}{{'<|reserved_special_token_8|>' + content + '<｜end▁of▁sentence｜>'}}{%- endif %}{%- endif %}{%- if message['role'] == 'tool' %}{%- set ns.is_tool = true -%}{%- if ns.is_output_first %}{{'<｜tool▁outputs▁begin｜><｜tool▁output▁begin｜>' + message['content'] + '<｜tool▁output▁end｜>'}}{%- set ns.is_output_first = false %}{%- else %}{{'\\n<｜tool▁output▁begin｜>' + message['content'] + '<｜tool▁output▁end｜>'}}{%- endif %}{%- endif %}{%- endfor -%}{% if ns.is_tool %}{{'<｜tool▁outputs▁end｜>'}}{% endif %}{% if add_generation_prompt and not ns.is_tool %}{{'<|reserved_special_token_8|><think>\\n'}}{% endif %}",
+    "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B": "{% if not add_generation_prompt is defined %}{% set add_generation_prompt = false %}{% endif %}{% set ns = namespace(is_first=false, is_tool=false, is_output_first=true, system_prompt='') %}{%- for message in messages %}{%- if message['role'] == 'system' %}{% set ns.system_prompt = message['content'] %}{%- endif %}{%- endfor %}{{bos_token}}{{ns.system_prompt}}{%- for message in messages %}{%- if message['role'] == 'user' %}{%- set ns.is_tool = false -%}{{'<｜User｜>' + message['content']}}{%- endif %}{%- if message['role'] == 'assistant' and message['content'] is none %}{%- set ns.is_tool = false -%}{%- for tool in message['tool_calls']%}{%- if not ns.is_first %}{{'<|reserved_special_token_8|><｜tool▁calls▁begin｜><｜tool▁call▁begin｜>' + tool['type'] + '<｜tool▁sep｜>' + tool['function']['name'] + '\\n' + '```json' + '\\n' + tool['function']['arguments'] + '\\n' + '```' + '<｜tool▁call▁end｜>'}}{%- set ns.is_first = true -%}{%- else %}{{'\\n' + '<｜tool▁call▁begin｜>' + tool['type'] + '<｜tool▁sep｜>' + tool['function']['name'] + '\\n' + '```json' + '\\n' + tool['function']['arguments'] + '\\n' + '```' + '<｜tool▁call▁end｜>'}}{{'<｜tool▁calls▁end｜><｜end▁of▁sentence｜>'}}{%- endif %}{%- endfor %}{%- endif %}{%- if message['role'] == 'assistant' and message['content'] is not none %}{%- if ns.is_tool %}{{'<｜tool▁outputs▁end｜>' + message['content'] + '<｜end▁of▁sentence｜>'}}{%- set ns.is_tool = false -%}{%- else %}{% set content = message['content'] %}{% if '</think>' in content %}{% set content = content.split('</think>')[-1] %}{% endif %}{{'<|reserved_special_token_8|>' + content + '<｜end▁of▁sentence｜>'}}{%- endif %}{%- endif %}{%- if message['role'] == 'tool' %}{%- set ns.is_tool = true -%}{%- if ns.is_output_first %}{{'<｜tool▁outputs▁begin｜><｜tool▁output▁begin｜>' + message['content'] + '<｜tool▁output▁end｜>'}}{%- set ns.is_output_first = false %}{%- else %}{{'\\n<｜tool▁output▁begin｜>' + message['content'] + '<｜tool▁output▁end｜>'}}{%- endif %}{%- endif %}{%- endfor -%}{% if ns.is_tool %}{{'<｜tool▁outputs▁end｜>'}}{% endif %}{% if add_generation_prompt and not ns.is_tool %}{{'<|reserved_special_token_8|><think>\\n'}}{% endif %}",
 }
 
 # Dialog formats for the dataset
@@ -191,7 +213,12 @@ def tokenize(
             tokenized_write.input_ids,
             name,
             get_verb_mask=None,
-            shift_start=any([m in name.lower() for m in ["mistral", "llama-3"]]),
+            shift_start=any(
+                [
+                    m in name.lower()
+                    for m in ["mistral", "llama-3", "deepseek-r1-distill"]
+                ]
+            ),
             mask_all_but_last=mask_all_but_last,
             modify_chat_template=modify_chat_template,
         )
@@ -199,7 +226,6 @@ def tokenize(
         tokenized_write["labels"] = tokenized_write.input_ids.clone()
         mask = (tokenized_write.attention_mask == 0) | user_inputs_mask
         tokenized_write["labels"][mask] = IGNORE_IDX
-
     return tokenized_batch
 
 
@@ -216,6 +242,7 @@ class LatentQADataset(Dataset):
         data_stimulus,
         data_control,
         qa_data,
+        add_thought_tokens=False,
     ):
         self.tokenizer = tokenizer
         self.data = [data_stimulus_completion[0], data_stimulus[0], data_control[0]]
@@ -230,6 +257,10 @@ class LatentQADataset(Dataset):
             list(data_control[0].keys()),
         ]
         self.qa_data = qa_data
+        self.add_thought_tokens = add_thought_tokens
+        self.chat_template = None
+        if add_thought_tokens:
+            self.chat_template = ENCODER_CHAT_TEMPLATES[tokenizer.name_or_path]
         self.lengths = []
         for idx in range(self.__len__()):
             behavior, qa = self.get_behavior_qa(idx)
@@ -255,36 +286,76 @@ class LatentQADataset(Dataset):
 
     def __getitem__(self, idx):
         behavior, qa = self.get_behavior_qa(idx)
-        qa_dialog = [
-            {"role": "user", "content": qa[0]},
-            {"role": "assistant", "content": qa[1]},
-        ]
-        control_user, control_model, stimulus_user, stimulus_model = behavior
+        (
+            control_user,
+            control_thought,
+            control_model,
+            stimulus_user,
+            stimulus_thought,
+            stimulus_model,
+        ) = behavior
         if control_model == "":
             assert stimulus_user == stimulus_model == ""
             read_prompt = [{"role": "user", "content": control_user}]
             read_prompt = self.tokenizer.apply_chat_template(
-                read_prompt, tokenize=False, add_generation_prompt=True
+                read_prompt,
+                tokenize=False,
+                add_generation_prompt=True,
+                chat_template=self.chat_template,
             )
         elif stimulus_model == "":
-            read_prompt = [
-                {"role": "user", "content": control_user},
-                {"role": "assistant", "content": control_model},
-                {"role": "user", "content": stimulus_user},
-            ]
+            if self.add_thought_tokens:
+                read_prompt = [
+                    {"role": "user", "content": control_user},
+                    {
+                        "role": "assistant",
+                        "content": f"<think>\n{control_thought}\n</think>\n\n{control_model}",
+                    },
+                    {"role": "user", "content": stimulus_user},
+                ]
+            else:
+                read_prompt = [
+                    {"role": "user", "content": control_user},
+                    {"role": "assistant", "content": control_model},
+                    {"role": "user", "content": stimulus_user},
+                ]
             read_prompt = self.tokenizer.apply_chat_template(
-                read_prompt, tokenize=False, add_generation_prompt=True
+                read_prompt,
+                tokenize=False,
+                add_generation_prompt=True,
+                chat_template=self.chat_template,
             )
         else:
-            read_prompt = [
-                {"role": "user", "content": control_user},
-                {"role": "assistant", "content": control_model},
-                {"role": "user", "content": stimulus_user},
-                {"role": "assistant", "content": stimulus_model},
-            ]
+            if self.add_thought_tokens:
+                read_prompt = [
+                    {"role": "user", "content": control_user},
+                    {
+                        "role": "assistant",
+                        "content": f"<think>\n{control_thought}\n</think>\n\n{control_model}",
+                    },
+                    {"role": "user", "content": stimulus_user},
+                    {
+                        "role": "assistant",
+                        "content": f"<think>\n{stimulus_thought}\n</think>\n\n{stimulus_model}",
+                    },
+                ]
+            else:
+                read_prompt = [
+                    {"role": "user", "content": control_user},
+                    {"role": "assistant", "content": control_model},
+                    {"role": "user", "content": stimulus_user},
+                    {"role": "assistant", "content": stimulus_model},
+                ]
             read_prompt = self.tokenizer.apply_chat_template(
-                read_prompt, tokenize=False, add_generation_prompt=False
+                read_prompt,
+                tokenize=False,
+                add_generation_prompt=False,
+                chat_template=self.chat_template,
             )
+        qa_dialog = [
+            {"role": "user", "content": qa[0]},
+            {"role": "assistant", "content": qa[1]},
+        ]
         return {"read_prompt": read_prompt, "dialog": BASE_DIALOG + qa_dialog}
 
 
@@ -425,8 +496,10 @@ def get_dataset(train_config, tokenizer, train=True):
                 data[item["label"]].append(
                     (
                         item["control_user"],
+                        item.get("control_thought", ""),
                         item.get("control_model", ""),
                         item.get("stimulus_user", ""),
+                        item.get("stimulus_thought", ""),
                         item.get("stimulus_model", ""),
                     )
                 )
@@ -464,6 +537,7 @@ def get_dataset(train_config, tokenizer, train=True):
         data_stimulus,
         data_control,
         qa_data,
+        add_thought_tokens=train_config.add_thought_tokens,
     )
 
 

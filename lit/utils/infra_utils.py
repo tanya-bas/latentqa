@@ -11,12 +11,12 @@ from copy import deepcopy
 from peft import get_peft_model, PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
+from transformers.models.qwen2.modeling_qwen2 import Qwen2DecoderLayer 
 
 import torch
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStrategy
 from torch.distributed.fsdp.fully_sharded_data_parallel import CPUOffload
-from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 from torch.distributed.fsdp.wrap import (
     _or_policy,
     lambda_auto_wrap_policy,
@@ -294,7 +294,7 @@ def get_model(
     else:
         model = AutoModelForCausalLM.from_pretrained(
             model_name,
-            attn_implementation="sdpa",
+            attn_implementation="flash_attention_2",
             torch_dtype=torch.bfloat16,
             use_cache=None,
             device_map="auto" if device == "auto" else None,
@@ -329,13 +329,15 @@ def get_model(
                 sharding_group_size=fsdp_args.sharding_group_size,
             )
             print("HSDP device mesh is ready")
+
+        DECODER_LAYER = LlamaDecoderLayer if 'llama' in model_name else Qwen2DecoderLayer
         wrapping_policy = partial(
             transformer_auto_wrap_policy,
             transformer_layer_cls={
-                LlamaDecoderLayer,
+                DECODER_LAYER,
             },
         )
-        my_auto_wrapping_policy = fsdp_auto_wrap_policy(model, LlamaDecoderLayer)
+        my_auto_wrapping_policy = fsdp_auto_wrap_policy(model, DECODER_LAYER)
         device_id = torch.cuda.current_device()
 
         model = FSDP(
@@ -361,7 +363,7 @@ def get_model(
                 checkpoint_wrapper,
                 checkpoint_impl=CheckpointImpl.NO_REENTRANT,
             )
-            check_fn = lambda submodule: isinstance(submodule, LlamaDecoderLayer)
+            check_fn = lambda submodule: isinstance(submodule, DECODER_LAYER)
             apply_activation_checkpointing(
                 model, checkpoint_wrapper_fn=non_reentrant_wrapper, check_fn=check_fn
             )
