@@ -215,11 +215,23 @@ def main(**kwargs):
                         }
                     )
 
+            if train_steps % args.save_every_n_steps == 0:
+                save_model(
+                    decoder_model if args.use_fsdp else decoder_model.module,
+                    ema,
+                    tokenizer,
+                    args,
+                    epoch,
+                    train_steps,
+                    logger,
+                    rank,
+                )
+
         # End of epoch
         scheduler.step()
         pbar.close()
 
-        if args.save_model and args.save_after_epoch:
+        if args.save_model:
             save_model(
                 decoder_model if args.use_fsdp else decoder_model.module,
                 ema,

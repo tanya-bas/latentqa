@@ -29,7 +29,7 @@ class train_config:
     # Please change to a directory with ample space as model checkpoints are saved here
     output_dir: str = "out/runs"
     save_model: bool = True
-    save_after_epoch: bool = False
+    save_every_n_steps: int = 1000
     use_wandb: bool = False
     run_name: str = ""
 
