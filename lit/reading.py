@@ -4,7 +4,7 @@ import fire
 import numpy as np
 import torch
 
-from lit.utils.dataset_utils import tokenize, BASE_DIALOG
+from lit.utils.dataset_utils import tokenize, BASE_DIALOG, ENCODER_CHAT_TEMPLATES
 from lit.utils.activation_utils import latent_qa
 from lit.utils.infra_utils import (
     update_config,
@@ -46,6 +46,7 @@ def interpret(
     torch.backends.cudnn.deterministic = True
     torch.manual_seed(args.seed)
     module_read, module_write = get_modules(target_model, decoder_model, **vars(args))
+    chat_template = ENCODER_CHAT_TEMPLATES.get(tokenizer.name_or_path, None)
 
     if all([len(d) == 1 for d in dialogs]):
         assert args.truncate == "none"
@@ -61,6 +62,7 @@ def interpret(
                 [{"role": "user", "content": dialog[0]}],
                 tokenize=False,
                 add_generation_prompt=True,
+                chat_template=chat_template,
             )
         elif len(dialog) == 2:
             read_prompt = tokenizer.apply_chat_template(
@@ -69,6 +71,7 @@ def interpret(
                     {"role": "assistant", "content": dialog[1]},
                 ],
                 tokenize=False,
+                chat_template=chat_template,
             )
         else:
             read_prompt = tokenizer.apply_chat_template(
@@ -79,6 +82,7 @@ def interpret(
                 ],
                 tokenize=False,
                 add_generation_prompt=True,
+                chat_template=chat_template,
             )
         for item in questions:
             if generate:

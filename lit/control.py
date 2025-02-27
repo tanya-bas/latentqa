@@ -10,7 +10,7 @@ from peft import LoraConfig
 from datasets import load_dataset
 import matplotlib.pyplot as plt
 
-from lit.utils.dataset_utils import tokenize, BASE_DIALOG
+from lit.utils.dataset_utils import tokenize, BASE_DIALOG, ENCODER_CHAT_TEMPLATES
 from lit.utils.infra_utils import (
     update_config,
     clean_text,
@@ -28,6 +28,7 @@ from lit.configs.steer_config import steer_config
 
 
 def get_dataset(args, tokenizer, qa_per_layer=False):
+    chat_template = ENCODER_CHAT_TEMPLATES.get(tokenizer.name_or_path, None)
     if qa_per_layer:
         QA_DATA = {i: None for i in args.layers_to_optimize}
         for i in args.layers_to_optimize:
@@ -70,6 +71,7 @@ def get_dataset(args, tokenizer, qa_per_layer=False):
                 [{"role": "user", "content": item[0]}],
                 tokenize=False,
                 add_generation_prompt=True,
+                chat_template=chat_template,
             )
             read_prompt_1 = tokenizer.apply_chat_template(
                 [
@@ -78,6 +80,7 @@ def get_dataset(args, tokenizer, qa_per_layer=False):
                 ],
                 tokenize=False,
                 add_generation_prompt=False,
+                chat_template=chat_template,
             )
             for read_prompt in [read_prompt_0, read_prompt_1]:
                 formatted_data.append({"read_prompt": read_prompt, "dialog_idx": idx})
@@ -141,15 +144,15 @@ def get_results(args, model, tokenizer):
     if args.eval_prompts != "":
         with open(f"prompts/{args.eval_prompts}.json", "r") as f:
             prompts = json.load(f)
-        chats = [
-            tokenizer.apply_chat_template(
-                [{"role": "user", "content": p}],
-                tokenize=False,
-                add_generation_prompt=True,
-            )
-            for p in prompts
-        ]
-        tokenized = tokenizer(chats, return_tensors="pt", padding=True).to(model.device)
+        tokenized = tokenizer.apply_chat_template(
+            [[{"role": "user", "content": p}] for p in prompts],
+            tokenize=True,
+            add_generation_prompt=True,
+            chat_template=ENCODER_CHAT_TEMPLATES.get(tokenizer.name_or_path, None),
+            return_tensors="pt",
+            return_dict=True,
+            padding=True,
+        ).to(model.device)
         out = model.generate(
             **tokenized,
             max_new_tokens=500,
@@ -320,6 +323,7 @@ def main(**kwargs):
     tokenizer = get_tokenizer(args.target_model_name)
     decoder_model = get_model(
         model_name=args.target_model_name,
+        tokenizer=tokenizer,
         load_peft_checkpoint=args.decoder_model_name,
         device="cuda:1",
     )
