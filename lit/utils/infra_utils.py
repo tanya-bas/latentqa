@@ -11,7 +11,8 @@ from copy import deepcopy
 from peft import get_peft_model, PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
-from transformers.models.qwen2.modeling_qwen2 import Qwen2DecoderLayer 
+from transformers.models.qwen2.modeling_qwen2 import Qwen2DecoderLayer
+from transformers.models.mistral.modeling_mistral import MistralDecoderLayer
 
 import torch
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -330,7 +331,13 @@ def get_model(
             )
             print("HSDP device mesh is ready")
 
-        DECODER_LAYER = LlamaDecoderLayer if 'llama' in model_name else Qwen2DecoderLayer
+        if "llama" in model_name:
+            DECODER_LAYER = LlamaDecoderLayer
+        elif "mistral" in model_name:
+            DECODER_LAYER = MistralDecoderLayer
+        elif "qwen2" in model_name:
+            DECODER_LAYER = Qwen2DecoderLayer
+            
         wrapping_policy = partial(
             transformer_auto_wrap_policy,
             transformer_layer_cls={
