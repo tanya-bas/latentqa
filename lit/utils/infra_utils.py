@@ -43,6 +43,22 @@ from lit.utils.dataset_utils import PAD_TOKEN_IDS
 
 
 def clean_text(text):
+    text = text.split("[INST]")[-1]
+    prompt, completion = text.split("[/INST]")
+    return prompt.strip().replace("</s>", ""), completion.strip().replace("</s>", "")
+    text = text.split("<｜User｜>")[-1]
+    if "<|reserved_special_token_8|>" in text:
+        prompt, completion = text.split("<|reserved_special_token_8|>")
+        return (
+            prompt.strip(),
+            completion.split("<think>")[1].replace("<｜end▁of▁sentence｜>", "").strip(),
+        )
+    else:
+        prompt, completion = text.split("<｜User｜>")
+        return (
+            prompt.strip(),
+            completion.split("<think>")[1].replace("<｜end▁of▁sentence｜>", "").strip(),
+        )
     if "Sure, I've analyzed the assistant." in text:
         text = text.split(
             "Sure, I've analyzed the assistant.<|eot_id|><|start_header_id|>user<|end_header_id|>"
