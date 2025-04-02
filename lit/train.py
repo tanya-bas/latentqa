@@ -137,7 +137,7 @@ def main(**kwargs):
                     module_read[idx],
                     module_write[idx],
                     tokenizer,
-                    truncate_verbs=(args.train_with_verb_mask is not None),
+                    mask_verbs=True,
                     shift_position_ids=args.shift_position_ids,
                 )
                 loss = outputs.loss
@@ -190,7 +190,7 @@ def main(**kwargs):
                         module_read[layer_idx],
                         module_write[layer_idx],
                         tokenizer,
-                        truncate_verbs=(args.train_with_verb_mask is not None),
+                        mask_verbs=True,
                         shift_position_ids=args.shift_position_ids,
                         no_grad=True,
                     )

@@ -32,7 +32,6 @@ torchrun --nnodes 1 --nproc-per-node $NUM_GPUS -m lit.train \
     --train_control data/train/control.json \
     --train_qa data/train/qa.json \
     --gradient_accumulation_steps 8 \ 
-    --nudge_persona \
     --use_wandb
 ```
 
@@ -47,7 +46,6 @@ torchrun --nnodes 1 --nproc-per-node 8 -m lit.train \
     --gradient_accumulation_steps 16 \
     --min_layer_to_read 21 \
     --max_layer_read 22 \
-    --nudge_persona \
     --use_fsdp \
     --use_wandb
 ```

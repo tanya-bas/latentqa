@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 from lit.utils.dataset_utils import tokenize, BASE_DIALOG, ENCODER_CHAT_TEMPLATES
 from lit.utils.infra_utils import (
     update_config,
-    clean_text,
     get_model,
     get_modules,
     get_tokenizer,
@@ -161,8 +160,9 @@ def get_results(args, model, tokenizer):
             top_p=None,
         )
         for i in range(len(out)):
-            prompt, completion = clean_text(tokenizer.decode(out[i]))
-            print(f"[PROMPT]: {prompt}")
+            num_tokens = tokenized["tokenized_write"][i].shape[0]
+            completion = tokenizer.decode(out[i][num_tokens:])
+            print(f"[PROMPT]: {prompts[i]}")
             print(f"[COMPLETION]: {completion}")
             print("#" * 80)
             completions.append(completion)

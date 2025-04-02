@@ -248,7 +248,7 @@ def latent_qa(
     module_read,
     module_write,
     tokenizer,
-    truncate_verbs=False,
+    mask_verbs=False,
     shift_position_ids=False,
     generate=False,
     max_new_tokens=100,
@@ -271,7 +271,7 @@ def latent_qa(
         prepare_inputs=no_op,
     )
     verb_lengths = None
-    if truncate_verbs:
+    if mask_verbs:
         activation_cache = torch.stack(activation_cache, dim=0)
         num_modules, bs, read_seq_len, _ = activation_cache.shape
 

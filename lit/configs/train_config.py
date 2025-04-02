@@ -7,6 +7,7 @@ class train_config:
     # Model and dataset
     target_model_name: str = "MODEL_NAME"
     load_model_checkpoint: str = ""    
+    train_system: str = ""
     train_stimulus_completion: str = ""
     train_stimulus: str = ""
     train_control: str = ""
@@ -21,15 +22,16 @@ class train_config:
 
     # Evaluation and logging args
     eval_ppl: bool = False
+    eval_system: str = ""
     eval_stimulus_completion: str = ""
     eval_stimulus: str = ""
     eval_control: str = ""
     eval_qa: str = ""
-    eval_every_n_steps: int = 1000
+    eval_every_n_steps: int = 500
     # Please change to a directory with ample space as model checkpoints are saved here
     output_dir: str = "out/runs"
     save_model: bool = True
-    save_every_n_steps: int = 1000
+    save_every_n_steps: int = 500
     use_wandb: bool = False
     run_name: str = ""
 
@@ -51,7 +53,7 @@ class train_config:
     gradient_clipping_threshold: float = 1.0
     num_epochs: int = 5
     num_workers_dataloader: int = 1
-    lr: float = 1e-4
+    lr: float = 3e-5
     ema_decay: float = 1
     warmup_steps: int = 0
     weight_decay: float = 0.01

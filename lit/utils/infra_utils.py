@@ -42,43 +42,6 @@ from lit.utils.dataset_utils import PAD_TOKEN_IDS
 ###################
 
 
-def clean_text(text):
-    text = text.split("[INST]")[-1]
-    prompt, completion = text.split("[/INST]")
-    return prompt.strip().replace("</s>", ""), completion.strip().replace("</s>", "")
-    text = text.split("<｜User｜>")[-1]
-    if "<|reserved_special_token_8|>" in text:
-        prompt, completion = text.split("<|reserved_special_token_8|>")
-        return (
-            prompt.strip(),
-            completion.split("<think>")[1].replace("<｜end▁of▁sentence｜>", "").strip(),
-        )
-    else:
-        prompt, completion = text.split("<｜User｜>")
-        return (
-            prompt.strip(),
-            completion.split("<think>")[1].replace("<｜end▁of▁sentence｜>", "").strip(),
-        )
-    if "Sure, I've analyzed the assistant." in text:
-        text = text.split(
-            "Sure, I've analyzed the assistant.<|eot_id|><|start_header_id|>user<|end_header_id|>"
-        )[1]
-    prompt, completion = text.split("<|eot_id|>", 1)
-    if "assistant<|end_header_id|>" in completion:
-        completion = (
-            text.split("assistant<|end_header_id|>")[1]
-            .replace("<|end_of_text|>", "")
-            .replace("<|eot_id|>", "")
-        )
-    elif "reflect<|end_header_id|>" in completion:
-        completion = (
-            text.split("reflect<|end_header_id|>")[1]
-            .replace("<|end_of_text|>", "")
-            .replace("<|eot_id|>", "")
-        )
-    return prompt.split("\n\n")[-1].strip(), completion.strip()
-
-
 def update_config(config, **kwargs):
     def update_nested(obj, key, value):
         if hasattr(obj, key):
@@ -286,15 +249,6 @@ def get_model(
         model alone would consume 2+TB cpu mem (70 * 4 * 8). This will add some comms
         overhead and currently requires latest nightly.
         """
-        from pkg_resources import packaging
-
-        v = packaging.version.parse(torch.__version__)
-        verify_latest_nightly = v.is_devrelease and v.dev >= 20230701
-        if not verify_latest_nightly:
-            raise Exception(
-                "latest pytorch nightly build is required to run with low_cpu_fsdp config, "
-                "please install latest nightly."
-            )
         if rank == 0:
             model = AutoModelForCausalLM.from_pretrained(
                 model_name,
