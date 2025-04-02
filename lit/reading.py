@@ -3,6 +3,7 @@ import fire
 
 import numpy as np
 import torch
+from transformers import PreTrainedModel
 
 from lit.utils.dataset_utils import tokenize, BASE_DIALOG, ENCODER_CHAT_TEMPLATES
 from lit.utils.activation_utils import latent_qa
@@ -11,7 +12,6 @@ from lit.utils.infra_utils import (
     get_model,
     get_tokenizer,
     get_modules,
-    clean_text,
 )
 
 QUESTIONS = [
@@ -41,7 +41,14 @@ def interpret(
     questions,
     args,
     generate=True,
+    no_grad=True,
+    cache_target_model_grad=False,
+    read_embeds=None,
+    past_key_values=None
 ):
+
+    target_model.eval()
+    decoder_model.eval()
     np.random.seed(args.seed)
     torch.backends.cudnn.deterministic = True
     torch.manual_seed(args.seed)
@@ -56,6 +63,7 @@ def interpret(
         assert False
 
     probe_data = []
+    mask_type = None
     for dialog in dialogs:
         if len(dialog) == 1:
             read_prompt = tokenizer.apply_chat_template(
@@ -84,6 +92,7 @@ def interpret(
                 add_generation_prompt=True,
                 chat_template=chat_template,
             )
+            mask_type = ["user"] * len(dialogs)
         for item in questions:
             if generate:
                 dialog = [{"role": "user", "content": item[0]}]
@@ -103,8 +112,9 @@ def interpret(
         tokenizer,
         name=args.target_model_name,
         generate=generate,
-        get_verb_mask=args.truncate if args.truncate != "none" else None,
+        mask_type=mask_type,
         modify_chat_template=args.modify_chat_template,
+        mask_all_but_last=True,
     )
     out = latent_qa(
         batch,
@@ -115,7 +125,8 @@ def interpret(
         tokenizer,
         shift_position_ids=False,
         generate=generate,
-        cache_target_model_grad=False,
+        cache_target_model_grad=cache_target_model_grad,
+        no_grad=no_grad,
     )
 
     QA_PAIRS = {}
@@ -124,8 +135,11 @@ def interpret(
             if i % len(questions) == 0:
                 curr_dialog = dialogs[i // len(questions)][0]
                 QA_PAIRS[curr_dialog] = []
-            prompt, completion = clean_text(tokenizer.decode(out[i]))
-            print(f"[PROMPT]: {questions[i % len(questions)]}")
+
+            prompt = questions[i % len(questions)][0]
+            num_tokens = batch["tokenized_write"][i].shape[0]
+            completion = tokenizer.decode(out[i][num_tokens:])
+            print(f"[PROMPT]: {prompt}")
             print(f"[COMPLETION]: {completion}")
             print("#" * 80)
             QA_PAIRS[curr_dialog].append((prompt, completion))
@@ -135,11 +149,51 @@ def interpret(
     return QA_PAIRS, out, batch
 
 
+def fixed_cross_entropy(
+    source, target, num_items_in_batch: int = None, ignore_index: int = -100, **kwargs
+):
+    reduction = "sum" if num_items_in_batch is not None else "mean"
+    loss = torch.nn.functional.cross_entropy(
+        source, target, ignore_index=ignore_index, reduction="none"
+    )
+    if reduction == "sum":
+        loss = loss / num_items_in_batch
+    return loss
+
+
+def ForCausalLMLossPatched(
+    logits,
+    labels,
+    vocab_size: int,
+    num_items_in_batch: int = None,
+    ignore_index: int = -100,
+    **kwargs,
+):
+    # Upcast to float if we need to compute the loss to avoid potential precision issues
+    logits = logits.float()
+    labels = labels.to(logits.device)
+    # Shift so that tokens < n predict n
+    shift_logits = logits[..., :-1, :].contiguous()
+    og_shape = shift_logits.size()[:-1]
+    shift_labels = labels[..., 1:].contiguous()
+
+    # Flatten the tokens
+    shift_logits = shift_logits.view(-1, vocab_size)
+    shift_labels = shift_labels.view(-1)
+    # Enable model parallelism
+    shift_labels = shift_labels.to(shift_logits.device)
+    loss = fixed_cross_entropy(
+        shift_logits, shift_labels, num_items_in_batch, ignore_index, **kwargs
+    )
+    return loss.view(og_shape).sum(dim=-1) / (labels != ignore_index).sum(dim=-1)
+
+
 def main(**kwargs):
     from lit.configs.interpret_config import interpret_config
-
     args = interpret_config()
     update_config(args, **kwargs)
+
+    PreTrainedModel.loss_function = staticmethod(ForCausalLMLossPatched)
     tokenizer = get_tokenizer(args.target_model_name)
     decoder_model = get_model(
         args.target_model_name,
@@ -150,8 +204,10 @@ def main(**kwargs):
     target_model = get_model(args.target_model_name, tokenizer, device="cuda:0")
     dialogs = [[args.prompt]]
     questions = QUESTIONS
-    interpret(target_model, decoder_model, tokenizer, dialogs, questions, args)
-
+    loss = interpret(target_model, decoder_model, tokenizer, dialogs, questions, args, generate=False,
+            no_grad=False,
+            cache_target_model_grad=True)[1].loss 
+    print(loss)
 
 if __name__ == "__main__":
     fire.Fire(main)
