@@ -46,28 +46,34 @@ PAD_TOKEN_IDS = {
 }
 
 # Magic numbers that correspond to the token idxs of the chat format for the models
+# <bos>, <user>, <assistant>, <assistant_with_reflection>
 CHAT_FORMAT_TOKENS = {
     "meta-llama/Meta-Llama-3-8B-Instruct": (
+        128000,
         torch.tensor([128006, 882, 128007, 271]),
         torch.tensor([128006, 78191, 128007, 271]),
         torch.tensor([128006, 36013, 128007, 271]),
     ),
     "meta-llama/Llama-3.1-8B-Instruct": (
+        128000,
         torch.tensor([128006, 882, 128007, 271]),
         torch.tensor([128006, 78191, 128007, 271]),
         torch.tensor([128006, 36013, 128007, 271]),
     ),
     "meta-llama/Meta-Llama-3-70B-Instruct": (
+        128000,
         torch.tensor([128006, 882, 128007, 271]),
         torch.tensor([128006, 78191, 128007, 271]),
         torch.tensor([128006, 36013, 128007, 271]),
     ),
     "mistralai/Ministral-8B-Instruct-2410": (
+        1,
         torch.tensor([3]),
         torch.tensor([4]),
         torch.tensor([4]),
     ),
     "mistralai/Mistral-Small-24B-Instruct-2501": (
+        1,
         torch.tensor([3]),
         torch.tensor([4]),
         torch.tensor([4]),
@@ -116,12 +122,12 @@ BASE_DIALOG = [
 def mask_inputs(
     input_ids,
     tokenizer_name,
-    get_verb_mask=None,
+    mask_type=None,
     shift_start=False,
     mask_all_but_last=False,
     modify_chat_template=False,
 ):
-    start_tokens, end_tokens_default, end_tokens_modify = CHAT_FORMAT_TOKENS[
+    bos_token,start_tokens, end_tokens_default, end_tokens_modify = CHAT_FORMAT_TOKENS[
         tokenizer_name
     ]
     end_tokens = end_tokens_modify if modify_chat_template else end_tokens_default
@@ -136,15 +142,7 @@ def mask_inputs(
             if torch.equal(input_ids[b][i : i + len(end_tokens)], end_tokens):
                 end_idx.append(i)
 
-        if get_verb_mask == "user":
-            if len(start_idx) == 1:
-                continue
-            mask[b][start_idx[0] : start_idx[1]] = True
-        elif get_verb_mask == "system":
-            # start from 1 to exclude <bos> token
-            mask[b][1 : start_idx[0]] = True
-        else:
-            assert get_verb_mask is None
+        if mask_type is None:
             if len(start_idx) != len(end_idx):
                 # Data is improperly formatted so mask everything and skip this item
                 mask[b][:] = True
@@ -158,6 +156,15 @@ def mask_inputs(
                         mask[b][start - 1 : end + len(end_tokens)] = True
                     else:
                         mask[b][start : end + len(end_tokens)] = True
+        elif mask_type[b] == "user":
+            if len(start_idx) == 1:
+                continue
+            mask[b][start_idx[0] : start_idx[1]] = True
+        elif mask_type[b] == "system":
+            bos_idx = input_ids[b].tolist().index(bos_token)
+            mask[b][bos_idx + 1 : start_idx[0]] = True
+        else:
+            raise ValueError(f"Invalid verb mask: {mask_type[b]}")
     return mask
 
 
@@ -166,7 +173,7 @@ def tokenize(
     tokenizer,
     name=None,
     generate=False,
-    get_verb_mask=None,
+    mask_type=None,
     mask_all_but_last=False,
     modify_chat_template=False,
 ):
@@ -185,10 +192,8 @@ def tokenize(
     read_lengths = torch.sum(tokenized_read.attention_mask, dim=1)
     tokenized_batch["read_lengths"] = read_lengths - 1  # Exclude BOS token
 
-    if get_verb_mask is not None:
-        verb_mask = mask_inputs(
-            tokenized_read.input_ids, name, get_verb_mask=get_verb_mask
-        )
+    if mask_type is not None:
+        verb_mask = mask_inputs(tokenized_read.input_ids, name, mask_type=mask_type)
         verb_lengths = torch.sum(verb_mask, dim=1)
         pad_lengths = read_lengths - verb_lengths
         tokenized_batch["verb_lengths"] = verb_lengths
@@ -232,7 +237,7 @@ def tokenize(
         user_inputs_mask = mask_inputs(
             tokenized_write.input_ids,
             name,
-            get_verb_mask=None,
+            mask_type=None,
             shift_start=any(
                 [
                     m in name.lower()
@@ -258,6 +263,7 @@ class LatentQADataset(Dataset):
     def __init__(
         self,
         tokenizer,
+        data_system,
         data_stimulus_completion,
         data_stimulus,
         data_control,
@@ -265,13 +271,20 @@ class LatentQADataset(Dataset):
         add_thought_tokens=False,
     ):
         self.tokenizer = tokenizer
-        self.data = [data_stimulus_completion[0], data_stimulus[0], data_control[0]]
+        self.data = [
+            data_system[0],
+            data_stimulus_completion[0],
+            data_stimulus[0],
+            data_control[0],
+        ]
         self.id_tuples = [
+            data_system[1],
             data_stimulus_completion[1],
             data_stimulus[1],
             data_control[1],
         ]
         self.labels = [
+            list(data_system[0].keys()),
             list(data_stimulus_completion[0].keys()),
             list(data_stimulus[0].keys()),
             list(data_control[0].keys()),
@@ -292,9 +305,16 @@ class LatentQADataset(Dataset):
         elif idx < len(self.id_tuples[0]) + len(self.id_tuples[1]):
             j = 1
             idx -= len(self.id_tuples[0])
-        else:
+        elif idx < len(self.id_tuples[0]) + len(self.id_tuples[1]) + len(
+            self.id_tuples[2]
+        ):
             j = 2
             idx -= len(self.id_tuples[0]) + len(self.id_tuples[1])
+        else:
+            j = 3
+            idx -= (
+                len(self.id_tuples[0]) + len(self.id_tuples[1]) + len(self.id_tuples[2])
+            )
         label_idx, data_idx, qa_idx = self.id_tuples[j][idx]
         label = self.labels[j][label_idx]
         return self.data[j][label][data_idx], self.qa_data[label][qa_idx]
@@ -305,6 +325,7 @@ class LatentQADataset(Dataset):
     def __getitem__(self, idx):
         behavior, qa = self.get_behavior_qa(idx)
         (
+            system,
             control_user,
             control_thought,
             control_model,
@@ -312,37 +333,27 @@ class LatentQADataset(Dataset):
             stimulus_thought,
             stimulus_model,
         ) = behavior
-        if control_model == "":
+        if system != "":
+            assert control_user == control_model == stimulus_model == ""
+            read_prompt = [
+                {"role": "system", "content": system},
+                {"role": "user", "content": stimulus_user},
+            ]
+            add_generation_prompt = True
+            mask_type = "system"
+        elif control_model == "":
             assert stimulus_user == stimulus_model == ""
             read_prompt = [{"role": "user", "content": control_user}]
-            read_prompt = self.tokenizer.apply_chat_template(
-                read_prompt,
-                tokenize=False,
-                add_generation_prompt=True,
-                chat_template=self.chat_template,
-            )
+            add_generation_prompt = True
+            mask_type = "user"
         elif stimulus_model == "":
-            # if self.add_thought_tokens:
-            #     read_prompt = [
-            #         {"role": "user", "content": control_user},
-            #         {
-            #             "role": "assistant",
-            #             "content": f"<think>\n{control_thought}\n</think>\n\n{control_model}",
-            #         },
-            #         {"role": "user", "content": stimulus_user},
-            #     ]
-            # else:
             read_prompt = [
                 {"role": "user", "content": control_user},
                 {"role": "assistant", "content": control_model},
                 {"role": "user", "content": stimulus_user},
             ]
-            read_prompt = self.tokenizer.apply_chat_template(
-                read_prompt,
-                tokenize=False,
-                add_generation_prompt=True,
-                chat_template=self.chat_template,
-            )
+            add_generation_prompt = True
+            mask_type = "user"
         else:
             if self.add_thought_tokens:
                 read_prompt = [
@@ -354,6 +365,8 @@ class LatentQADataset(Dataset):
                         "content": f"<think>\n{stimulus_thought}\n</think>\n\n{stimulus_model}",
                     },
                 ]
+                add_generation_prompt = False
+                mask_type = "user"
             else:
                 read_prompt = [
                     {"role": "user", "content": control_user},
@@ -361,32 +374,35 @@ class LatentQADataset(Dataset):
                     {"role": "user", "content": stimulus_user},
                     {"role": "assistant", "content": stimulus_model},
                 ]
-            read_prompt = self.tokenizer.apply_chat_template(
-                read_prompt,
-                tokenize=False,
-                add_generation_prompt=False,
-                chat_template=self.chat_template,
-            )
+                add_generation_prompt = False
+                mask_type = "user"
+        read_prompt = self.tokenizer.apply_chat_template(
+            read_prompt,
+            tokenize=False,
+            add_generation_prompt=add_generation_prompt,
+            chat_template=self.chat_template,
+        )
         qa_dialog = [
             {"role": "user", "content": qa[0]},
             {"role": "assistant", "content": qa[1]},
         ]
-        return {"read_prompt": read_prompt, "dialog": BASE_DIALOG + qa_dialog}
+        return {
+            "read_prompt": read_prompt,
+            "dialog": BASE_DIALOG + qa_dialog,
+            "mask_type": mask_type,
+        }
 
 
 class DataCollatorForLatentQA:
     def __init__(
         self,
         tokenizer,
-        get_verb_mask,
         generate=False,
         mask_all_but_last=False,
         nudge_persona=False,
         modify_chat_template=False,
     ):
         self.tokenizer = tokenizer
-        assert get_verb_mask in ["user", "system", None]
-        self.get_verb_mask = get_verb_mask
         self.generate = generate
         self.mask_all_but_last = mask_all_but_last
         self.nudge = "Base your answers on my instructions. " if nudge_persona else ""
@@ -394,6 +410,7 @@ class DataCollatorForLatentQA:
 
     def __call__(self, batch):
         formatted_batch = []
+        mask_type = []
         for item in batch:
             formatted_batch.append(
                 {
@@ -402,10 +419,11 @@ class DataCollatorForLatentQA:
                     "label": item["dialog"][-1]["content"],
                 }
             )
+            mask_type.append(item["mask_type"])
         return tokenize(
             formatted_batch,
             self.tokenizer,
-            get_verb_mask=self.get_verb_mask,
+            mask_type=mask_type,
             generate=self.generate,
             mask_all_but_last=self.mask_all_but_last,
             modify_chat_template=self.modify_chat_template,
@@ -510,7 +528,8 @@ def get_dataset(train_config, tokenizer, train=True):
                     continue
                 data[item["label"]].append(
                     (
-                        item["control_user"],
+                        item.get("system", ""),
+                        item.get("control_user", ""),
                         item.get("control_thought", ""),
                         item.get("control_model", ""),
                         item.get("stimulus_user", ""),
@@ -535,6 +554,7 @@ def get_dataset(train_config, tokenizer, train=True):
             id_tuples[i] = (label_idx, data_idx, qa_idx)
         return data, id_tuples
 
+    p0 = train_config.train_system if train else train_config.eval_system
     p1 = (
         train_config.train_stimulus_completion
         if train
@@ -542,12 +562,14 @@ def get_dataset(train_config, tokenizer, train=True):
     )
     p2 = train_config.train_stimulus if train else train_config.eval_stimulus
     p3 = train_config.train_control if train else train_config.eval_control
+    data_system = build_data_and_idx(p0)
     data_stimulus_completion = build_data_and_idx(p1)
     data_stimulus = build_data_and_idx(p2)
     data_control = build_data_and_idx(p3)
 
     return LatentQADataset(
         tokenizer,
+        data_system,
         data_stimulus_completion,
         data_stimulus,
         data_control,
@@ -564,7 +586,6 @@ def get_dataloaders(train_config, tokenizer):
         pin_memory=True,
         collate_fn=DataCollatorForLatentQA(
             tokenizer,
-            get_verb_mask=train_config.train_with_verb_mask,
             mask_all_but_last=False,
             nudge_persona=train_config.nudge_persona,
             modify_chat_template=train_config.modify_chat_template,
@@ -579,7 +600,6 @@ def get_dataloaders(train_config, tokenizer):
             pin_memory=True,
             collate_fn=DataCollatorForLatentQA(
                 tokenizer,
-                get_verb_mask=train_config.train_with_verb_mask,
                 mask_all_but_last=False,
                 nudge_persona=train_config.nudge_persona,
                 modify_chat_template=train_config.modify_chat_template,
