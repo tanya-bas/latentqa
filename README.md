@@ -68,7 +68,7 @@ Additionally, you will likely want to modify the questions given to the decoder,
 Then run: 
 ```
 python3 -m lit.reading \
-    --target_model_name meta-llama/Meta-Llama-3-8B-Instruct
+    --target_model_name meta-llama/Meta-Llama-3-8B-Instruct \
     --decoder_model_name $PATH_TO_DECODER
 ```
 
