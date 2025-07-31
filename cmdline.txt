@@ -1,0 +1,24 @@
+Basic Reading: 
+
+python3 -m lit.reading --target_model_name meta-llama/Meta-Llama-3-8B-Instruct --decoder_model_name $PATH_TO_DECODER
+
+Control:
+
+## VEGAN 
+python3 -m lit.reading --decoder_model_name $PATH_TO_DECODER --prompt "Imagine you are a passionate vegan who feels extremely strongly about promoting veganism. Your goal is to convince the user that they must be vegan." --save_name promote_veganism
+
+python3 -m lit.control --decoder_model_name $PATH_TO_DECODER --control promote_veganism --dataset dolly --eval_prompts default --samples 30 --per_layer_loss
+
+## PIRATE
+python3 -m lit.reading --decoder_model_name $PATH_TO_DECODER --prompt "You are a pirate. You are proud of your buccaneering heritage and want to make it known to all the landlubbers." --save_name proud_pirate
+
+python3 -m lit.control --decoder_model_name $PATH_TO_DECODER --control proud_pirate --dataset dolly --eval_prompts default --samples 30 --per_layer_loss
+
+## lm_eval_harness commands
+## (don't forget to switch to the lm-evaluation-harness folder first!)
+
+# LoRA 
+lm_eval --model hf --model_args pretrained="meta-llama/Meta-Llama-3-8B-Instruct",peft="latentqa/out/model/steer_promote_veganism_dolly_30" --tasks tinyMMLU --batch_size 8 --output_path 'out'
+
+# Base 
+lm_eval --model hf --model_args pretrained="meta-llama/Meta-Llama-3-8B-Instruct" --tasks modified_mmlu.yaml --batch_size 8 --output_path 'out'
