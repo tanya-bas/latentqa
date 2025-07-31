@@ -97,10 +97,18 @@ def interpret(
             if generate:
                 dialog = [{"role": "user", "content": item[0]}]
             else:
-                dialog = [
-                    {"role": "user", "content": item[0]},
-                    {"role": "assistant", "content": item[1]},
-                ]
+                # When generate=False, we need both question and answer
+                # If item only has one element (question), create a placeholder answer
+                if len(item) == 1:
+                    dialog = [
+                        {"role": "user", "content": item[0]},
+                        {"role": "assistant", "content": "I will provide an answer."},
+                    ]
+                else:
+                    dialog = [
+                        {"role": "user", "content": item[0]},
+                        {"role": "assistant", "content": item[1]},
+                    ]
             probe_data.append(
                 {
                     "read_prompt": read_prompt,
@@ -199,7 +207,7 @@ def main(**kwargs):
         args.target_model_name,
         tokenizer,
         load_peft_checkpoint=args.decoder_model_name,
-        device="cuda:1",
+        device="cuda:0",
     )
     target_model = get_model(args.target_model_name, tokenizer, device="cuda:0")
     dialogs = [[args.prompt]]

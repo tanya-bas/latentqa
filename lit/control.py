@@ -325,7 +325,7 @@ def main(**kwargs):
         model_name=args.target_model_name,
         tokenizer=tokenizer,
         load_peft_checkpoint=args.decoder_model_name,
-        device="cuda:1",
+        device="cuda:0",
     )
     if args.per_layer_loss:
         per_layer_loss(args, decoder_model, tokenizer, device="cuda:0", **kwargs)
