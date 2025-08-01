@@ -28,10 +28,10 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
     CheckpointImpl,
     apply_activation_checkpointing,
 )
-from torch.distributed.checkpoint.state_dict import (
-    get_model_state_dict,
-    StateDictOptions,
-)
+# from torch.distributed.checkpoint.state_dict import (
+#     get_model_state_dict,
+#     StateDictOptions,
+# )
 from peft.tuners import PrefixEncoder, PromptEmbedding, PromptEncoder
 
 from lit.utils.dataset_utils import PAD_TOKEN_IDS
@@ -44,6 +44,7 @@ from lit.utils.dataset_utils import PAD_TOKEN_IDS
 
 def update_config(config, **kwargs):
     def update_nested(obj, key, value):
+        # print(f"Updating {key} to {value} in {type(obj).__name__}")
         if hasattr(obj, key):
             if is_dataclass(getattr(obj, key)):
                 update_config(
@@ -114,10 +115,10 @@ def save_model(decoder_model, ema_model, tokenizer, args, epoch, steps, logger, 
     ]:
         if model is None:
             continue
-        options = StateDictOptions(full_state_dict=True, cpu_offload=True)
-        state_dict = get_model_state_dict(model, options=options)
+        # options = StateDictOptions(full_state_dict=True, cpu_offload=True)
+        # state_dict = get_model_state_dict(model, options=options)
         if rank == 0:
-            model.save_pretrained(dir, state_dict=state_dict)
+            model.save_pretrained(dir)
             tokenizer.save_pretrained(dir)
             logger.info(f"{name} is saved in {dir} directory")
 
@@ -280,6 +281,7 @@ def get_model(
     if peft_config is not None:
         model = get_peft_model(model, peft_config)
     elif load_peft_checkpoint is not None:
+        # print(f"[Config is NONE] Loading PEFT checkpoint from {load_peft_checkpoint}")
         model = PeftModel.from_pretrained(model, load_peft_checkpoint)
 
     # Distribute models

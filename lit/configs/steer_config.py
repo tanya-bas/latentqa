@@ -52,7 +52,7 @@ class steer_config:
     qa_per_layer: bool = False
 
     eval_prompts: str = ""
-    save_model: bool = False
+    save_model: bool = True
 
     def __post_init__(self):
         mlp_modules = ["gate_proj", "up_proj", "down_proj", "lm_head"]

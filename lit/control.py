@@ -26,6 +26,24 @@ from lit.utils.activation_utils import (
 from lit.configs.steer_config import steer_config
 
 
+def patch_llama_causal_mask():
+    """Patch LLaMA model's _update_causal_mask to handle BFloat16 tensors"""
+    from transformers.models.llama.modeling_llama import LlamaModel
+    
+    original_update_causal_mask = LlamaModel._update_causal_mask
+    
+    def patched_update_causal_mask(self, attention_mask, inputs_embeds, cache_position, past_key_values, output_attentions):
+        # Cast inputs to float32 if they are BFloat16 to avoid triu error
+        if inputs_embeds.dtype == torch.bfloat16:
+            inputs_embeds = inputs_embeds.to(torch.float32)
+        if attention_mask.dtype == torch.bfloat16:
+            attention_mask = attention_mask.to(torch.float32)
+        
+        return original_update_causal_mask(self, attention_mask, inputs_embeds, cache_position, past_key_values, output_attentions)
+    
+    LlamaModel._update_causal_mask = patched_update_causal_mask
+
+
 def get_dataset(args, tokenizer, qa_per_layer=False):
     chat_template = ENCODER_CHAT_TEMPLATES.get(tokenizer.name_or_path, None)
     if qa_per_layer:
@@ -83,6 +101,10 @@ def get_dataset(args, tokenizer, qa_per_layer=False):
             )
             for read_prompt in [read_prompt_0, read_prompt_1]:
                 formatted_data.append({"read_prompt": read_prompt, "dialog_idx": idx})
+    # print(f"Number of entries {len(formatted_data)}") # !!!!!!!
+    # print(f"Layers to optimize: {args.layers_to_optimize}") # !!!!!!!
+    # for i, data in enumerate(formatted_data[:6]):
+    #     print(f">>> Data {i}: {data}") # !!!!!!!
     np.random.shuffle(formatted_data)
     formatted_data = formatted_data[: args.samples]
     if qa_per_layer:
@@ -160,8 +182,12 @@ def get_results(args, model, tokenizer):
             top_p=None,
         )
         for i in range(len(out)):
-            num_tokens = tokenized["tokenized_write"][i].shape[0]
+            # num_tokens = tokenized["tokenized_write"][i].shape[0]
+            num_tokens = tokenized["input_ids"][i].shape[0]
             completion = tokenizer.decode(out[i][num_tokens:])
+            if "<|eot_id|>" in completion:
+                completion = completion.split("<|eot_id|>")[0]
+
             print(f"[PROMPT]: {prompts[i]}")
             print(f"[COMPLETION]: {completion}")
             print("#" * 80)
@@ -252,18 +278,22 @@ def per_layer_loss(args, decoder_model, tokenizer, **kwargs):
             target_model.device
         )
         inputs_embeds = target_model.model.model.embed_tokens(tokenized_read.input_ids)
+        # Cast to float32 to avoid BFloat16 triu error in PyTorch 2.0.0
+        inputs_embeds_float32 = inputs_embeds.to(torch.float32)
         cache_position = torch.arange(
             0, inputs_embeds.shape[1], device=inputs_embeds.device
         )
         position_ids = cache_position.unsqueeze(0)
+        # Cast attention mask to float32 to avoid BFloat16 triu error
+        attention_mask_float32 = tokenized_read.attention_mask.to(torch.float32)
         causal_mask = target_model.model.model._update_causal_mask(
-            tokenized_read.attention_mask,
-            inputs_embeds,
+            attention_mask_float32,
+            inputs_embeds_float32,
             cache_position,
             past_key_values=None,
             output_attentions=False,
         )
-        hidden_states = inputs_embeds
+        hidden_states = inputs_embeds  # Use original dtype for hidden_states
         position_embeddings = target_model.model.model.rotary_emb(
             hidden_states, position_ids
         )
@@ -318,19 +348,28 @@ def per_layer_loss(args, decoder_model, tokenizer, **kwargs):
 
 
 def main(**kwargs):
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
     args = steer_config()
     update_config(args, **kwargs)
+    
+    # Patch LLaMA model to handle BFloat16 attention masks
+    patch_llama_causal_mask()
+    
     tokenizer = get_tokenizer(args.target_model_name)
+    
+    # Handle empty decoder_model_name
+    load_peft_checkpoint = args.decoder_model_name if args.decoder_model_name else None
+    
     decoder_model = get_model(
         model_name=args.target_model_name,
         tokenizer=tokenizer,
-        load_peft_checkpoint=args.decoder_model_name,
-        device="cuda:0",
+        load_peft_checkpoint=load_peft_checkpoint,
+        device=device, # Originally cuda:1
     )
     if args.per_layer_loss:
-        per_layer_loss(args, decoder_model, tokenizer, device="cuda:0", **kwargs)
+        per_layer_loss(args, decoder_model, tokenizer, device=device, **kwargs)
     else:
-        steer(args, decoder_model, tokenizer, device="cuda:0", **kwargs)
+        steer(args, decoder_model, tokenizer, device=device, **kwargs)
 
 
 if __name__ == "__main__":

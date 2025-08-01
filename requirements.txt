@@ -1,9 +1,9 @@
 aiohttp
 fire
 matplotlib
-numpy>=1.26.2
+numpy>=1.26.0
 peft==0.10.0
-torch>=2.0.0
-transformers>=4.46.2
+torch==2.0.0
+transformers==4.46.2
 tqdm
 wandb

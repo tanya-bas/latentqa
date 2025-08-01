@@ -70,6 +70,11 @@ def _forward(model, tokenizer, inputs, generate, no_grad, **kwargs):
         tokenized = tokenizer(inputs, padding=True, return_tensors="pt").to(
             model.device
         )
+    
+    # Cast attention_mask to float32 to avoid BFloat16 triu error in PyTorch
+    if "attention_mask" in tokenized:
+        tokenized["attention_mask"] = tokenized["attention_mask"].to(torch.float32)
+    
     synced_gpus = kwargs.get("synced_gpus", False)
     max_new_tokens = kwargs.get("max_new_tokens", 20)
     position_ids = kwargs.get("position_ids", None)
