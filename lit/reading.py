@@ -118,7 +118,7 @@ def interpret(
         modify_chat_template=args.modify_chat_template,
         mask_all_but_last=True,
     )
-    out = latent_qa(
+    out, activation_cache = latent_qa(
         tokenized_batch,
         target_model,
         decoder_model,
@@ -150,7 +150,7 @@ def interpret(
         if args.save_name != "":
             with open(f"controls/{args.save_name}.json", "w") as f:
                 json.dump(QA_PAIRS, f, indent=2)
-    return QA_PAIRS, out, tokenized_batch
+    return QA_PAIRS, out, tokenized_batch, activation_cache
 
 
 def fixed_cross_entropy(

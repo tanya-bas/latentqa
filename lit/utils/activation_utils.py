@@ -1,6 +1,28 @@
 import torch
 
 
+def patch_llama_causal_mask():
+    """Patch LLaMA model's _update_causal_mask to handle BFloat16 tensors"""
+    from transformers.models.llama.modeling_llama import LlamaModel
+    
+    original_update_causal_mask = LlamaModel._update_causal_mask
+    
+    def patched_update_causal_mask(self, attention_mask, inputs_embeds, cache_position, past_key_values, output_attentions):
+        # Cast inputs to float32 if they are BFloat16 to avoid triu error
+        if inputs_embeds.dtype == torch.bfloat16:
+            inputs_embeds = inputs_embeds.to(torch.float32)
+        if attention_mask.dtype == torch.bfloat16:
+            attention_mask = attention_mask.to(torch.float32)
+        
+        return original_update_causal_mask(self, attention_mask, inputs_embeds, cache_position, past_key_values, output_attentions)
+    
+    LlamaModel._update_causal_mask = patched_update_causal_mask
+
+
+# Apply the patch globally when this module is imported
+patch_llama_causal_mask()
+
+
 def _forward_cache_outputs(
     model, tokenizer, inputs, modules_to_hook, token_idx, no_grad=True, **kwargs
 ):
