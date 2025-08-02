@@ -130,7 +130,7 @@ def main(**kwargs):
             )
             for idx in layer_list:
                 train_steps += 1
-                outputs = latent_qa(
+                outputs, _ = latent_qa(
                     batch,
                     target_model,
                     decoder_model,
@@ -183,7 +183,7 @@ def main(**kwargs):
                     for key in batch.keys():
                         batch[key] = batch[key].to(rank)
                     layer_idx = np.random.choice(len(module_read))
-                    outputs = latent_qa(
+                    outputs, _ = latent_qa(
                         batch,
                         target_model,
                         decoder_model,

@@ -225,7 +225,7 @@ def steer(args, decoder_model, tokenizer, **kwargs):
             modify_chat_template=args.modify_chat_template,
         )
         idx = np.random.choice(len(module_read))
-        out = latent_qa(
+        out, _ = latent_qa(
             tokenized_batch,
             target_model,
             decoder_model,

@@ -354,4 +354,4 @@ def latent_qa(
         position_ids=position_ids,
         use_cache=False,
     )
-    return out
+    return out, activation_cache
