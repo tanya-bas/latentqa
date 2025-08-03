@@ -160,8 +160,8 @@ def get_results(args, model, tokenizer):
             top_p=None,
         )
         for i in range(len(out)):
-            num_tokens = tokenized["tokenized_write"][i].shape[0]
-            completion = tokenizer.decode(out[i][num_tokens:])
+            tokenized_input_length = len(tokenized['input_ids'][i])
+            completion = tokenizer.decode(out[i][tokenized_input_length:]).split("<|end_of_text|>", 1)[0]
             print(f"[PROMPT]: {prompts[i]}")
             print(f"[COMPLETION]: {completion}")
             print("#" * 80)
@@ -325,7 +325,7 @@ def main(**kwargs):
         model_name=args.target_model_name,
         tokenizer=tokenizer,
         load_peft_checkpoint=args.decoder_model_name,
-        device="cuda:1",
+        device="cuda",
     )
     if args.per_layer_loss:
         per_layer_loss(args, decoder_model, tokenizer, device="cuda:0", **kwargs)

@@ -137,7 +137,7 @@ def interpret(
                 QA_PAIRS[curr_dialog] = []
 
             prompt = questions[i % len(questions)][0]
-            num_tokens = batch["tokenized_write"][i].shape[0]
+            num_tokens = len(batch["tokenized_write"][i])
             completion = tokenizer.decode(out[i][num_tokens:])
             print(f"[PROMPT]: {prompt}")
             print(f"[COMPLETION]: {completion}")
@@ -199,15 +199,12 @@ def main(**kwargs):
         args.target_model_name,
         tokenizer,
         load_peft_checkpoint=args.decoder_model_name,
-        device="cuda:1",
+        device="cuda",
     )
-    target_model = get_model(args.target_model_name, tokenizer, device="cuda:0")
+    target_model = get_model(args.target_model_name, tokenizer, device="cuda")
     dialogs = [[args.prompt]]
     questions = QUESTIONS
-    loss = interpret(target_model, decoder_model, tokenizer, dialogs, questions, args, generate=False,
-            no_grad=False,
-            cache_target_model_grad=True)[1].loss 
-    print(loss)
+    qa_pairs, out, batch = interpret(target_model, decoder_model, tokenizer, dialogs, questions, args, generate=True,no_grad=False,cache_target_model_grad=True)
 
 if __name__ == "__main__":
     fire.Fire(main)
