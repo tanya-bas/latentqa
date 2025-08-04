@@ -112,12 +112,13 @@ def main(**kwargs):
             trainable_params = sum(p.numel() for p in model_for_params.parameters() if p.requires_grad)
             print(f"Total parameters: {total_params:,}")
             print(f"Trainable parameters: {trainable_params:,}")
-            print(f"Training method: {'SFT (supervised fine-tuning)' if args.peft_method == 'sft' else 'LoRA'}")
+            print(f"Training method: {'SFT (supervised fine-tuning)' if args.peft_method == 'sft' or not args.use_peft else 'LoRA'}")
         
         if wandb_run is not None and args.load_model_checkpoint == "":
             if peft_config is not None:
                 wandb_run.config.update(peft_config)
-            wandb_run.config.update({"training_method": args.peft_method})
+            training_method = "sft" if args.peft_method == "sft" or not args.use_peft else args.peft_method
+            wandb_run.config.update({"training_method": training_method})
     module_read, module_write = get_modules(
         target_model, decoder_model, **args.__dict__
     )
