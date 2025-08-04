@@ -59,8 +59,8 @@ class train_config:
     weight_decay: float = 0.01
     gamma: float = 0.85
     seed: int = 42
-    # Set to 'None' for full model training
-    peft_method: str = "lora"
-    use_peft: bool = True
+    # Set peft_method to 'lora' for LoRA training or 'sft' for supervised fine-tuning
+    peft_method: str = "lora"  # Options: "lora", "sft"
+    use_peft: bool = True  # Set to False when using SFT for full model training
     use_fsdp: bool = False
     

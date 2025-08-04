@@ -79,10 +79,19 @@ def main(**kwargs):
     target_model = get_model(
         args.target_model_name, tokenizer, fsdp_args=fsdp_args, device=device, rank=rank
     )
-    lora_params = {
-        k.name: getattr(lora_config(), k.name) for k in fields(lora_config())
-    }
-    peft_config = LoraConfig(**lora_params)
+    
+    # Configure PEFT based on training method
+    peft_config = None
+    enable_full_finetuning = False
+    
+    if args.use_peft and args.peft_method == "lora":
+        lora_params = {
+            k.name: getattr(lora_config(), k.name) for k in fields(lora_config())
+        }
+        peft_config = LoraConfig(**lora_params)
+    elif args.peft_method == "sft":
+        enable_full_finetuning = True
+    
     decoder_model = get_model(
         args.target_model_name,
         tokenizer,
@@ -91,13 +100,25 @@ def main(**kwargs):
         device=device,
         rank=rank,
         distributed_training=use_distributed,
+        enable_full_finetuning=enable_full_finetuning,
     )
     torch.cuda.empty_cache()
     if rank == 0:
         model_for_params = decoder_model.module if use_distributed else decoder_model
-        model_for_params.print_trainable_parameters()
+        if hasattr(model_for_params, 'print_trainable_parameters'):
+            model_for_params.print_trainable_parameters()
+        else:
+            # For SFT (supervised fine-tuning), print total parameters
+            total_params = sum(p.numel() for p in model_for_params.parameters())
+            trainable_params = sum(p.numel() for p in model_for_params.parameters() if p.requires_grad)
+            print(f"Total parameters: {total_params:,}")
+            print(f"Trainable parameters: {trainable_params:,}")
+            print(f"Training method: {'SFT (supervised fine-tuning)' if args.peft_method == 'sft' else 'LoRA'}")
+        
         if wandb_run is not None and args.load_model_checkpoint == "":
-            wandb_run.config.update(peft_config)
+            if peft_config is not None:
+                wandb_run.config.update(peft_config)
+            wandb_run.config.update({"training_method": args.peft_method})
     module_read, module_write = get_modules(
         target_model, decoder_model, **args.__dict__
     )

@@ -241,6 +241,7 @@ def get_model(
     device=None,
     rank=None,
     distributed_training=False,
+    enable_full_finetuning=False,
 ):
     if fsdp_args is not None and fsdp_args.low_cpu_fsdp:
         """
@@ -271,8 +272,16 @@ def get_model(
             device_map="auto" if device == "auto" else None,
         )
     model.resize_token_embeddings(len(tokenizer))
-    for _, param in model.named_parameters():
-        param.requires_grad = False
+    
+    # Set parameter gradients based on training method
+    if enable_full_finetuning:
+        # For SFT (supervised fine-tuning), enable gradients for all parameters
+        for _, param in model.named_parameters():
+            param.requires_grad = True
+    else:
+        # For PEFT training, initially disable all gradients (PEFT will enable specific ones)
+        for _, param in model.named_parameters():
+            param.requires_grad = False
 
     # Load PEFT
     assert peft_config is None or load_peft_checkpoint is None
