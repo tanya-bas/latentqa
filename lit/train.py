@@ -88,7 +88,7 @@ def main(**kwargs):
             k.name: getattr(lora_config(), k.name) for k in fields(lora_config())
         }
         peft_config = LoraConfig(**lora_params)
-    elif args.peft_method == "sft":
+    elif args.peft_method == "sft" or not args.use_peft:
         enable_full_finetuning = True
     
     decoder_model = get_model(
