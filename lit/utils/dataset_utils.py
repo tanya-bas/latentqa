@@ -498,11 +498,20 @@ def get_batch_sampler(dataset, train_config, mode):
 
 
 def get_dist_batch_sampler(dataset, train_config, mode):
+    # Check if distributed training is initialized
+    try:
+        world_size = dist.get_world_size()
+        rank = dist.get_rank()
+    except (RuntimeError, ValueError):
+        # Not in distributed mode, use single GPU settings
+        world_size = 1
+        rank = 0
+        
     return DistributedLengthBasedBatchSampler(
         dataset,
         train_config.batch_size_training,
-        num_replicas=dist.get_world_size(),
-        rank=dist.get_rank(),
+        num_replicas=world_size,
+        rank=rank,
         shuffle=(mode == "train"),
         seed=train_config.seed,
     )
