@@ -588,6 +588,16 @@ def get_dataset(train_config, tokenizer, train=True):
 
 
 def get_dataloaders(train_config, tokenizer):
+    # Check if we're in distributed mode
+    try:
+        dist.get_world_size()
+        use_distributed = True
+    except (RuntimeError, ValueError):
+        use_distributed = False
+    
+    # Choose appropriate batch sampler based on distributed mode
+    sampler_fn = get_dist_batch_sampler if use_distributed else get_batch_sampler
+    
     dataset_train = get_dataset(train_config, tokenizer, train=True)
     train_dataloader = torch.utils.data.DataLoader(
         dataset_train,
@@ -599,7 +609,7 @@ def get_dataloaders(train_config, tokenizer):
             nudge_persona=train_config.nudge_persona,
             modify_chat_template=train_config.modify_chat_template,
         ),
-        batch_sampler=get_dist_batch_sampler(dataset_train, train_config, "train"),
+        batch_sampler=sampler_fn(dataset_train, train_config, "train"),
     )
     if train_config.eval_ppl:
         dataset_eval = get_dataset(train_config, tokenizer, train=False)
@@ -613,7 +623,7 @@ def get_dataloaders(train_config, tokenizer):
                 nudge_persona=train_config.nudge_persona,
                 modify_chat_template=train_config.modify_chat_template,
             ),
-            batch_sampler=get_dist_batch_sampler(dataset_eval, train_config, "val"),
+            batch_sampler=sampler_fn(dataset_eval, train_config, "val"),
         )
         return train_dataloader, eval_dataloader
 
