@@ -5,7 +5,6 @@ import fire
 from tqdm import tqdm
 
 import numpy as np
-import wandb
 from transformers import get_cosine_schedule_with_warmup
 from peft import LoraConfig
 import torch
@@ -271,6 +270,7 @@ def main(**kwargs):
                 dist.barrier()
 
     if wandb_run is not None:
+        import wandb
         wandb.finish()
     if use_distributed:
         dist.destroy_process_group()
