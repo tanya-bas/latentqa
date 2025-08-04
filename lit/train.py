@@ -37,27 +37,34 @@ from lit.utils.activation_utils import latent_qa
 
 
 def main(**kwargs):
-    # Get args and setup DDP
-    dist.init_process_group("nccl")
+    # Get args and setup for single GPU
+    use_distributed = os.environ.get("LOCAL_RANK") is not None
+    if use_distributed:
+        dist.init_process_group("nccl")
+        rank = dist.get_rank()
+        world_size = dist.get_world_size()
+    else:
+        rank = 0
+        world_size = 1
+    
     assert torch.cuda.is_available()
     args = train_config()
     update_config(args, **kwargs)
     fsdp_args = None
-    if args.use_fsdp:
+    if args.use_fsdp and use_distributed:
         from lit.configs.fsdp_config import fsdp_config
 
         fsdp_args = fsdp_config()
         update_config(fsdp_args, **kwargs)
 
-    rank = dist.get_rank()
-    device = rank % torch.cuda.device_count()
+    device = rank % torch.cuda.device_count() if use_distributed else 0
     torch.cuda.set_device(device)
     torch.cuda.empty_cache()
-    seed = args.seed * dist.get_world_size() + rank
+    seed = args.seed * world_size + rank
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
-    print(f"Starting rank={rank}, seed={seed}, world_size={dist.get_world_size()}.")
+    print(f"Starting rank={rank}, seed={seed}, world_size={world_size}.")
 
     logger = get_logger(args, rank)
     wandb_run = None
@@ -83,17 +90,19 @@ def main(**kwargs):
         fsdp_args=fsdp_args,
         device=device,
         rank=rank,
-        distributed_training=True,
+        distributed_training=use_distributed,
     )
     torch.cuda.empty_cache()
     if rank == 0:
-        decoder_model.module.print_trainable_parameters()
+        model_for_params = decoder_model.module if use_distributed else decoder_model
+        model_for_params.print_trainable_parameters()
         if wandb_run is not None and args.load_model_checkpoint == "":
             wandb_run.config.update(peft_config)
     module_read, module_write = get_modules(
         target_model, decoder_model, **args.__dict__
     )
-    ema = get_ema(decoder_model.module, decay=args.ema_decay, device=device)
+    model_for_ema = decoder_model.module if use_distributed else decoder_model
+    ema = get_ema(model_for_ema, decay=args.ema_decay, device=device)
 
     # Initialize the optimizer and learning rate scheduler
     optimizer = optim.AdamW(
@@ -154,7 +163,8 @@ def main(**kwargs):
                         )
                     optimizer.step()
                     optimizer.zero_grad()
-                    update_ema(ema, decoder_model.module, decay=args.ema_decay)
+                    model_for_ema = decoder_model.module if use_distributed else decoder_model
+                    update_ema(ema, model_for_ema, decay=args.ema_decay)
                     pbar.update(1)
 
             if wandb_run is not None:
@@ -196,28 +206,42 @@ def main(**kwargs):
                     )
                     total_loss += outputs.loss.detach().float()
                     pbar.update(1)
-                losses = torch.zeros(8).to(f"cuda:{rank}")
-                losses[rank] = total_loss
-                gathered_loss = (
-                    [torch.empty_like(losses) for _ in range(dist.get_world_size())]
-                    if rank == 0
-                    else None
-                )
-                dist.gather(losses, gathered_loss, dst=0)
-                if rank == 0 and wandb_run is not None:
-                    all_loss = torch.sum(torch.stack(gathered_loss))
-                    all_loss = all_loss / len(eval_dataloader) / dist.get_world_size()
-                    wandb_run.log(
-                        {
-                            "train/epoch": epoch,
-                            "train/step": epoch * len(train_dataloader) + step,
-                            "eval/loss": all_loss.detach().float(),
-                        }
+                
+                if use_distributed:
+                    losses = torch.zeros(8).to(f"cuda:{rank}")
+                    losses[rank] = total_loss
+                    gathered_loss = (
+                        [torch.empty_like(losses) for _ in range(dist.get_world_size())]
+                        if rank == 0
+                        else None
                     )
+                    dist.gather(losses, gathered_loss, dst=0)
+                    if rank == 0 and wandb_run is not None:
+                        all_loss = torch.sum(torch.stack(gathered_loss))
+                        all_loss = all_loss / len(eval_dataloader) / dist.get_world_size()
+                        wandb_run.log(
+                            {
+                                "train/epoch": epoch,
+                                "train/step": epoch * len(train_dataloader) + step,
+                                "eval/loss": all_loss.detach().float(),
+                            }
+                        )
+                else:
+                    # Single GPU evaluation
+                    avg_loss = total_loss / len(eval_dataloader)
+                    if wandb_run is not None:
+                        wandb_run.log(
+                            {
+                                "train/epoch": epoch,
+                                "train/step": epoch * len(train_dataloader) + step,
+                                "eval/loss": avg_loss.detach().float(),
+                            }
+                        )
 
             if train_steps % args.save_every_n_steps == 0:
+                model_to_save = decoder_model if args.use_fsdp else (decoder_model.module if use_distributed else decoder_model)
                 save_model(
-                    decoder_model if args.use_fsdp else decoder_model.module,
+                    model_to_save,
                     ema,
                     tokenizer,
                     args,
@@ -232,8 +256,9 @@ def main(**kwargs):
         pbar.close()
 
         if args.save_model:
+            model_to_save = decoder_model if args.use_fsdp else (decoder_model.module if use_distributed else decoder_model)
             save_model(
-                decoder_model if args.use_fsdp else decoder_model.module,
+                model_to_save,
                 ema,
                 tokenizer,
                 args,
@@ -242,11 +267,13 @@ def main(**kwargs):
                 logger,
                 rank,
             )
-            dist.barrier()
+            if use_distributed:
+                dist.barrier()
 
     if wandb_run is not None:
         wandb.finish()
-    dist.destroy_process_group()
+    if use_distributed:
+        dist.destroy_process_group()
     logger.info("Training completed!")
 
 
