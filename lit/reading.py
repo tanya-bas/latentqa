@@ -210,7 +210,7 @@ def main(**kwargs):
     target_model = get_model(args.target_model_name, tokenizer, device=device)
     dialogs = [[args.prompt]]
     questions = QUESTIONS
-    qa_pairs, output, _ = interpret(
+    qa_pairs, output, tokenized_batch, activation_cache = interpret(
         target_model, 
         decoder_model, 
         tokenizer, 
