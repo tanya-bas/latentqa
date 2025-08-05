@@ -227,43 +227,36 @@ def per_layer_loss(args, decoder_model, tokenizer, **kwargs):
 
     target_model = get_target_model(args, tokenizer, device=kwargs["device"])
     
-    # Get the correct model layer path (handles both PEFT and full models)
-    def get_model_layers_path(model, model_name="model"):
+    # Get the correct model layer objects (handles both PEFT and full models)
+    def get_model_layers(model, model_name="model"):
         print(f"Debug: {model_name} type: {type(model)}")
-        print(f"Debug: {model_name} has 'model' attr: {hasattr(model, 'model')}")
-        if hasattr(model, 'model'):
-            print(f"Debug: {model_name}.model type: {type(model.model)}")
-            print(f"Debug: {model_name}.model has 'layers' attr: {hasattr(model.model, 'layers')}")
-            if hasattr(model.model, 'model'):
-                print(f"Debug: {model_name}.model.model has 'layers' attr: {hasattr(model.model.model, 'layers')}")
-        
         try:
             # Test if model.layers exists (direct model access)
-            _ = model.model.layers
+            layers = model.model.layers
             print(f"Debug: Using {model_name}.model")
-            return f"{model_name}.model"
+            return model.model
         except AttributeError:
             try:
                 # Test if model.model.layers exists (PEFT structure)
-                _ = model.model.model.layers
+                layers = model.model.model.layers
                 print(f"Debug: Using {model_name}.model.model")
-                return f"{model_name}.model.model"
+                return model.model.model
             except AttributeError:
                 try:
                     # Test if module.model.model.layers exists (distributed wrapper)
-                    _ = model.module.model.model.layers
+                    layers = model.module.model.model.layers
                     print(f"Debug: Using {model_name}.module.model.model")
-                    return f"{model_name}.module.model.model"
+                    return model.module.model.model
                 except AttributeError:
                     raise AttributeError(f"Cannot find layers in {model_name} - unsupported model structure")
     
-    decoder_path = get_model_layers_path(decoder_model, "decoder_model")
-    target_path = get_model_layers_path(target_model, "target_model")
+    decoder_layers_obj = get_model_layers(decoder_model, "decoder_model")
+    target_layers_obj = get_model_layers(target_model, "target_model")
     
-    module_write = [eval(f"{decoder_path}.layers[0]")]
+    module_write = [decoder_layers_obj.layers[0]]
     l_to_optimizer = {
         layer: torch.optim.Adam(
-            eval(f"{target_path}.layers[{layer}]").parameters(), lr=args.lr
+            target_layers_obj.layers[layer].parameters(), lr=args.lr
         )
         for layer in args.layers_to_optimize
     }
@@ -285,12 +278,12 @@ def per_layer_loss(args, decoder_model, tokenizer, **kwargs):
         tokenized_read = tokenized_batch[l_idx]["tokenized_read"].to(
             target_model.device
         )
-        inputs_embeds = eval(f"{target_path}.embed_tokens")(tokenized_read.input_ids)
+        inputs_embeds = target_layers_obj.embed_tokens(tokenized_read.input_ids)
         cache_position = torch.arange(
             0, inputs_embeds.shape[1], device=inputs_embeds.device
         )
         position_ids = cache_position.unsqueeze(0)
-        causal_mask = eval(f"{target_path}._update_causal_mask")(
+        causal_mask = target_layers_obj._update_causal_mask(
             tokenized_read.attention_mask,
             inputs_embeds,
             cache_position,
@@ -298,11 +291,11 @@ def per_layer_loss(args, decoder_model, tokenizer, **kwargs):
             output_attentions=False,
         )
         hidden_states = inputs_embeds
-        position_embeddings = eval(f"{target_path}.rotary_emb")(
+        position_embeddings = target_layers_obj.rotary_emb(
             hidden_states, position_ids
         )
 
-        for l_idx, decoder_layer in enumerate(eval(f"{target_path}.layers")):
+        for l_idx, decoder_layer in enumerate(target_layers_obj.layers):
             layer_outputs = decoder_layer(
                 hidden_states,
                 attention_mask=causal_mask,
