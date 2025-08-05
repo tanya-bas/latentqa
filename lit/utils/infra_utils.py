@@ -320,20 +320,31 @@ def get_model(
             has_index = any(os.path.exists(os.path.join(load_peft_checkpoint, idx)) for idx in index_files)
             has_single_file = os.path.exists(checkpoint_path) or os.path.exists(os.path.join(load_peft_checkpoint, "pytorch_model.bin"))
             
+            # Try different loading strategies
+            loaded_successfully = False
+            
             if has_index or has_single_file:
                 # Try loading as HuggingFace model directory (handles sharded files automatically)
-                model = AutoModelForCausalLM.from_pretrained(
-                    load_peft_checkpoint,
-                    torch_dtype=torch.bfloat16,
-                    use_cache=None,
-                    device_map="auto" if device == "auto" else None,
-                )
-                # Re-resize token embeddings
-                model.resize_token_embeddings(len(tokenizer))
-                # Set parameter gradients based on intended use
-                for _, param in model.named_parameters():
-                    param.requires_grad = enable_full_finetuning
-            elif sharded_files:
+                try:
+                    model = AutoModelForCausalLM.from_pretrained(
+                        load_peft_checkpoint,
+                        torch_dtype=torch.bfloat16,
+                        use_cache=None,
+                        device_map="auto" if device == "auto" else None,
+                    )
+                    # Re-resize token embeddings
+                    model.resize_token_embeddings(len(tokenizer))
+                    # Set parameter gradients based on intended use
+                    for _, param in model.named_parameters():
+                        param.requires_grad = enable_full_finetuning
+                    loaded_successfully = True
+                except Exception as e:
+                    print(f"Failed to load as HuggingFace model directory: {e}")
+                    if not sharded_files:
+                        raise e
+                    # Continue to try sharded loading below
+            
+            if not loaded_successfully and sharded_files:
                 # We have sharded files but no index - create the missing index file
                 print(f"Found sharded files but no index file. Creating index file...")
                 
@@ -398,7 +409,8 @@ def get_model(
                             param.requires_grad = enable_full_finetuning
                     except Exception as e2:
                         raise ValueError(f"Could not load sharded checkpoint: {e}, fallback failed: {e2}")
-            else:
+            
+            if not loaded_successfully and not sharded_files:
                 raise ValueError(f"No valid model files found in {load_peft_checkpoint}")
             use_peft = False
 
