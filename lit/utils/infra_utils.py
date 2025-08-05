@@ -386,51 +386,51 @@ def get_model(
                     try:
                         from safetensors import safe_open
                         import json
-                    
-                    # Create weight map and metadata
-                    weight_map = {}
-                    total_size = 0
-                    
-                    for shard_file in sorted(sharded_files):
-                        shard_path = os.path.join(load_peft_checkpoint, shard_file)
-                        try:
-                            with safe_open(shard_path, framework="pt", device="cpu") as f:
-                                for key in f.keys():
-                                    weight_map[key] = shard_file
-                                    # Try to get tensor info for size calculation
-                                    try:
-                                        tensor = f.get_tensor(key)
-                                        total_size += tensor.numel() * tensor.element_size()
-                                    except:
-                                        pass  # Skip size calculation if it fails
-                        except Exception as e:
-                            print(f"Warning: Could not read shard {shard_file}: {e}")
-                            continue
-                    
-                    # Create the index file
-                    index_data = {
-                        "metadata": {"total_size": total_size},
-                        "weight_map": weight_map
-                    }
-                    
-                    index_path = os.path.join(load_peft_checkpoint, "model.safetensors.index.json")
-                    with open(index_path, 'w') as f:
-                        json.dump(index_data, f, indent=2)
-                    
-                    print(f"Created index file: {index_path}")
-                    
-                    # Now try loading with the index file
-                    model = AutoModelForCausalLM.from_pretrained(
-                        load_peft_checkpoint,
-                        torch_dtype=torch.bfloat16,
-                        use_cache=None,
-                        device_map="auto" if device == "auto" else None,
-                    )
-                    # Re-resize token embeddings
-                    model.resize_token_embeddings(len(tokenizer))
-                    # Set parameter gradients based on intended use
-                    for _, param in model.named_parameters():
-                        param.requires_grad = enable_full_finetuning
+                        
+                        # Create weight map and metadata
+                        weight_map = {}
+                        total_size = 0
+                        
+                        for shard_file in sorted(sharded_files):
+                            shard_path = os.path.join(load_peft_checkpoint, shard_file)
+                            try:
+                                with safe_open(shard_path, framework="pt", device="cpu") as f:
+                                    for key in f.keys():
+                                        weight_map[key] = shard_file
+                                        # Try to get tensor info for size calculation
+                                        try:
+                                            tensor = f.get_tensor(key)
+                                            total_size += tensor.numel() * tensor.element_size()
+                                        except:
+                                            pass  # Skip size calculation if it fails
+                            except Exception as e:
+                                print(f"Warning: Could not read shard {shard_file}: {e}")
+                                continue
+                        
+                        # Create the index file
+                        index_data = {
+                            "metadata": {"total_size": total_size},
+                            "weight_map": weight_map
+                        }
+                        
+                        index_path = os.path.join(load_peft_checkpoint, "model.safetensors.index.json")
+                        with open(index_path, 'w') as f:
+                            json.dump(index_data, f, indent=2)
+                        
+                        print(f"Created index file: {index_path}")
+                        
+                        # Now try loading with the index file
+                        model = AutoModelForCausalLM.from_pretrained(
+                            load_peft_checkpoint,
+                            torch_dtype=torch.bfloat16,
+                            use_cache=None,
+                            device_map="auto" if device == "auto" else None,
+                        )
+                        # Re-resize token embeddings
+                        model.resize_token_embeddings(len(tokenizer))
+                        # Set parameter gradients based on intended use
+                        for _, param in model.named_parameters():
+                            param.requires_grad = enable_full_finetuning
                         
                 except Exception as e:
                     print(f"Failed to create index file or load model: {e}")
