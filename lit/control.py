@@ -229,15 +229,33 @@ def per_layer_loss(args, decoder_model, tokenizer, **kwargs):
     
     # Get the correct model layer path (handles both PEFT and full models)
     def get_model_layers_path(model, model_name="model"):
+        print(f"Debug: {model_name} type: {type(model)}")
+        print(f"Debug: {model_name} has 'model' attr: {hasattr(model, 'model')}")
+        if hasattr(model, 'model'):
+            print(f"Debug: {model_name}.model type: {type(model.model)}")
+            print(f"Debug: {model_name}.model has 'layers' attr: {hasattr(model.model, 'layers')}")
+            if hasattr(model.model, 'model'):
+                print(f"Debug: {model_name}.model.model has 'layers' attr: {hasattr(model.model.model, 'layers')}")
+        
         try:
-            eval(f"{model_name}.model.layers")
+            # Test if model.layers exists (direct model access)
+            _ = model.model.layers
+            print(f"Debug: Using {model_name}.model")
             return f"{model_name}.model"
-        except:
+        except AttributeError:
             try:
-                eval(f"{model_name}.model.model.layers")
+                # Test if model.model.layers exists (PEFT structure)
+                _ = model.model.model.layers
+                print(f"Debug: Using {model_name}.model.model")
                 return f"{model_name}.model.model"
-            except:
-                return f"{model_name}.module.model.model"
+            except AttributeError:
+                try:
+                    # Test if module.model.model.layers exists (distributed wrapper)
+                    _ = model.module.model.model.layers
+                    print(f"Debug: Using {model_name}.module.model.model")
+                    return f"{model_name}.module.model.model"
+                except AttributeError:
+                    raise AttributeError(f"Cannot find layers in {model_name} - unsupported model structure")
     
     decoder_path = get_model_layers_path(decoder_model, "decoder_model")
     target_path = get_model_layers_path(target_model, "target_model")
