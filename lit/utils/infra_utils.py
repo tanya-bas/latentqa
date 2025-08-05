@@ -303,41 +303,62 @@ def get_model(
     if peft_config is not None:
         model = get_peft_model(model, peft_config)
     elif load_peft_checkpoint is not None:
-        # Check if the checkpoint contains LoRA adapters
+        # Check if this is a local directory or HuggingFace model name
         import os
-
-        adapter_config_path = os.path.join(load_peft_checkpoint, "adapter_config.json")
-        if os.path.exists(adapter_config_path):
-            # print(f"[Config is NONE] Loading PEFT checkpoint from {load_peft_checkpoint}")
-            model = PeftModel.from_pretrained(model, load_peft_checkpoint)
+        is_local_path = os.path.exists(load_peft_checkpoint)
+        
+        if not is_local_path:
+            # This is a HuggingFace model name - load it directly
+            print(f"Loading HuggingFace model: {load_peft_checkpoint}")
+            model = AutoModelForCausalLM.from_pretrained(
+                load_peft_checkpoint,
+                torch_dtype=torch.bfloat16,
+                use_cache=None,
+                device_map="auto" if device == "auto" else None,
+            )
+            model.resize_token_embeddings(len(tokenizer))
+            # Set parameter gradients based on training method
+            if enable_full_finetuning:
+                for _, param in model.named_parameters():
+                    param.requires_grad = True
+            else:
+                for _, param in model.named_parameters():
+                    param.requires_grad = False
+            use_peft = False
         else:
-            # This is a full model checkpoint, load the state dict
-            print(f"Loading full model checkpoint from {load_peft_checkpoint}")
-            checkpoint_path = os.path.join(load_peft_checkpoint, "pytorch_model.bin")
-            if not os.path.exists(checkpoint_path):
-                checkpoint_path = os.path.join(
-                    load_peft_checkpoint, "model.safetensors"
-                )
-            
-            # Check for index files that indicate sharded models
-            index_files = [
-                "pytorch_model.bin.index.json",
-                "model.safetensors.index.json"
-            ]
-            
-            # Check for sharded model files
-            sharded_files = []
-            for filename in os.listdir(load_peft_checkpoint):
-                if filename.startswith("model-") and filename.endswith(".safetensors"):
-                    sharded_files.append(filename)
-            
-            has_index = any(os.path.exists(os.path.join(load_peft_checkpoint, idx)) for idx in index_files)
-            has_single_file = os.path.exists(checkpoint_path) or os.path.exists(os.path.join(load_peft_checkpoint, "pytorch_model.bin"))
-            
-            # Try different loading strategies
-            loaded_successfully = False
-            
-            if has_index or has_single_file:
+            # This is a local checkpoint - check if it contains LoRA adapters
+            adapter_config_path = os.path.join(load_peft_checkpoint, "adapter_config.json")
+            if os.path.exists(adapter_config_path):
+                # print(f"[Config is NONE] Loading PEFT checkpoint from {load_peft_checkpoint}")
+                model = PeftModel.from_pretrained(model, load_peft_checkpoint)
+            else:
+                # This is a full model checkpoint, load the state dict
+                print(f"Loading full model checkpoint from {load_peft_checkpoint}")
+                checkpoint_path = os.path.join(load_peft_checkpoint, "pytorch_model.bin")
+                if not os.path.exists(checkpoint_path):
+                    checkpoint_path = os.path.join(
+                        load_peft_checkpoint, "model.safetensors"
+                    )
+                
+                # Check for index files that indicate sharded models
+                index_files = [
+                    "pytorch_model.bin.index.json",
+                    "model.safetensors.index.json"
+                ]
+                
+                # Check for sharded model files
+                sharded_files = []
+                for filename in os.listdir(load_peft_checkpoint):
+                    if filename.startswith("model-") and filename.endswith(".safetensors"):
+                        sharded_files.append(filename)
+                
+                has_index = any(os.path.exists(os.path.join(load_peft_checkpoint, idx)) for idx in index_files)
+                has_single_file = os.path.exists(checkpoint_path) or os.path.exists(os.path.join(load_peft_checkpoint, "pytorch_model.bin"))
+                
+                # Try different loading strategies
+                loaded_successfully = False
+                
+                if has_index or has_single_file:
                 # Try loading as HuggingFace model directory (handles sharded files automatically)
                 try:
                     model = AutoModelForCausalLM.from_pretrained(
