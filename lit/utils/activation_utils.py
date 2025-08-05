@@ -147,8 +147,9 @@ def get_pos_ids(tokenized_read, tokenized_write, verb_lengths=None):
     pad = read_pad_lengths - write_pad_lengths
     position_ids = torch.arange(len(tokenized_write.input_ids[0]))
     position_ids = position_ids.unsqueeze(0).expand(len(pad), -1) + pad.unsqueeze(1)
-    # Make all negative elements 0
+    # Make all negative elements 0 and ensure integer type
     position_ids = torch.maximum(position_ids, torch.zeros_like(position_ids))
+    position_ids = position_ids.to(torch.long)  # Ensure integer type
     return position_ids
 
 

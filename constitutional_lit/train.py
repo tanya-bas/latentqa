@@ -493,8 +493,24 @@ class ConstitutionalLatentQATrainer:
         
         # Get modules
         module_read, module_write = get_modules(
-            self.target_model, self.decoder_model, **self.args.__dict__
+            self.target_model, self.decoder_model, 
+            **self.args.__dict__
         )
+        
+        # Adjust layer configuration for smaller models like DialoGPT
+        if "dialogpt" in self.args.target_model_name.lower() or "gpt2" in self.args.target_model_name.lower():
+            # DialoGPT-large has 36 layers, so adjust the range
+            if len(module_read) == 0:
+                print("Warning: No layers found, adjusting layer configuration for GPT-2 style model")
+                # Use layers 30-35 for DialoGPT (last few layers)
+                module_read, module_write = get_modules(
+                    self.target_model, self.decoder_model,
+                    min_layer_to_read=30,
+                    max_layer_to_read=36,
+                    num_layers_to_read=1,
+                    layer_to_write=0,
+                    module_setup='read-vary_write-fixed_n-fixed'
+                )
         
         # Training loop
         train_steps = 0

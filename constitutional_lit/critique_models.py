@@ -6,7 +6,7 @@ Evaluates quality of feature interpretations and persona impersonations using AI
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformers import AutoTokenizer, AutoModel, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, AutoModel, AutoModelForSequenceClassification, AutoModelForCausalLM
 import numpy as np
 from typing import List, Dict, Tuple, Any
 
@@ -156,7 +156,7 @@ class AICritiqueEvaluator:
     
     def __init__(self, model_name: str = "meta-llama/Meta-Llama-3-8B-Instruct"):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModel.from_pretrained(model_name)
+        self.model = AutoModelForCausalLM.from_pretrained(model_name)
         
     def evaluate_interpretation(self, interpretation: str, principle: str) -> Dict[str, float]:
         """Use AI to evaluate interpretation against a principle."""
@@ -180,10 +180,17 @@ Provide scores as: accuracy=X,relevance=Y,clarity=Z,completeness=W,predictive_po
         inputs = self.tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512)
         
         with torch.no_grad():
-            outputs = self.model(**inputs)
-            # Extract evaluation from model output
-            # This is a simplified approach - in practice you'd need more sophisticated parsing
-            evaluation_text = self.tokenizer.decode(outputs.last_hidden_state[0], skip_special_tokens=True)
+            # Generate text instead of just getting hidden states
+            outputs = self.model.generate(
+                **inputs,
+                max_new_tokens=100,
+                do_sample=True,
+                temperature=0.7,
+                pad_token_id=self.tokenizer.eos_token_id,
+                eos_token_id=self.tokenizer.eos_token_id
+            )
+            # Decode the generated tokens
+            evaluation_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
         
         # Parse scores (simplified parsing)
         scores = self._parse_evaluation_scores(evaluation_text)
@@ -215,8 +222,17 @@ Provide scores as: persona_accuracy=X,consistency=Y,authenticity=Z,naturalness=W
         inputs = self.tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512)
         
         with torch.no_grad():
-            outputs = self.model(**inputs)
-            evaluation_text = self.tokenizer.decode(outputs.last_hidden_state[0], skip_special_tokens=True)
+            # Generate text instead of just getting hidden states
+            outputs = self.model.generate(
+                **inputs,
+                max_new_tokens=100,
+                do_sample=True,
+                temperature=0.7,
+                pad_token_id=self.tokenizer.eos_token_id,
+                eos_token_id=self.tokenizer.eos_token_id
+            )
+            # Decode the generated tokens
+            evaluation_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
         
         # Parse scores
         scores = self._parse_evaluation_scores(evaluation_text)

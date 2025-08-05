@@ -368,43 +368,55 @@ def get_modules(
     module_setup="read-vary_write-fixed_n-fixed",
     **kwargs,
 ):
-    # If in eval mode, target_model has LORA layers attached to it
-    try:
-        eval("target_model.model.layers")
-        target_model_str = "target_model.model"
-    except:
+    # Handle different model architectures
+    def get_model_layers(model, model_name):
+        """Get the layers from a model, handling different architectures."""
         try:
-            eval("target_model.model.model.layers")
-            target_model_str = "target_model.model.model"
-        except:
-            target_model_str = "target_model.module.model.model"
-    try:
-        eval("decoder_model.model.layers")
-        decoder_model_str = "decoder_model.model"
-    except:
-        try:
-            eval("decoder_model.model.model.layers")
-            decoder_model_str = "decoder_model.model.model"
-        except:
-            decoder_model_str = "decoder_model.module.model.model"
-
+            # Try Llama-style models
+            if hasattr(model, 'model') and hasattr(model.model, 'layers'):
+                return model.model.layers
+            elif hasattr(model, 'model') and hasattr(model.model, 'model') and hasattr(model.model.model, 'layers'):
+                return model.model.model.layers
+            elif hasattr(model, 'module') and hasattr(model.module, 'model') and hasattr(model.module.model, 'layers'):
+                return model.module.model.layers
+            # Try GPT-2 style models
+            elif hasattr(model, 'transformer') and hasattr(model.transformer, 'h'):
+                return model.transformer.h
+            elif hasattr(model, 'model') and hasattr(model.model, 'transformer') and hasattr(model.model.transformer, 'h'):
+                return model.model.transformer.h
+            else:
+                raise AttributeError(f"Could not find layers in model: {model_name}")
+        except Exception as e:
+            print(f"Error accessing layers for {model_name}: {e}")
+            raise
+    
+    # Get layers for both models
+    target_layers = get_model_layers(target_model, "target_model")
+    decoder_layers = get_model_layers(decoder_model, "decoder_model")
+    
     # List[List[Module]]
     module_read, module_write = [], []
     for i in range(min_layer_to_read, max_layer_to_read):
         module_read_i, module_write_i = [], []
         if module_setup == "read-vary_write-vary_n-fixed":
             for j in range(i, i + num_layers_to_read):
-                module_read_i.append(eval(f"{target_model_str}.layers[{j}]"))
-                module_write_i.append(eval(f"{decoder_model_str}.layers[{j}]"))
+                if j < len(target_layers):
+                    module_read_i.append(target_layers[j])
+                if j < len(decoder_layers):
+                    module_write_i.append(decoder_layers[j])
         elif module_setup == "read-vary_write-vary_n-vary":
             for j in range(i):
-                module_read_i.append(eval(f"{target_model_str}.layers[{j}]"))
-                module_write_i.append(eval(f"{decoder_model_str}.layers[{j}]"))
+                if j < len(target_layers):
+                    module_read_i.append(target_layers[j])
+                if j < len(decoder_layers):
+                    module_write_i.append(decoder_layers[j])
         elif module_setup == "read-vary_write-fixed_n-fixed":
             for j in range(i, i + num_layers_to_read):
-                module_read_i.append(eval(f"{target_model_str}.layers[{j}]"))
+                if j < len(target_layers):
+                    module_read_i.append(target_layers[j])
             for j in range(layer_to_write, layer_to_write + num_layers_to_read):
-                module_write_i.append(eval(f"{decoder_model_str}.layers[{j}]"))
+                if j < len(decoder_layers):
+                    module_write_i.append(decoder_layers[j])
         else:
             raise NotImplementedError
         module_read.append(module_read_i)
