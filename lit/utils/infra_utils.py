@@ -304,8 +304,15 @@ def get_model(
                 checkpoint_path = os.path.join(
                     load_peft_checkpoint, "model.safetensors"
                 )
-            if not os.path.exists(checkpoint_path):
-                # Try loading as HuggingFace model directory
+            
+            # Check for sharded model files
+            sharded_files = []
+            for filename in os.listdir(load_peft_checkpoint):
+                if filename.startswith("model-") and filename.endswith(".safetensors"):
+                    sharded_files.append(filename)
+            
+            if sharded_files or os.path.exists(checkpoint_path) or os.path.exists(os.path.join(load_peft_checkpoint, "pytorch_model.bin")):
+                # Try loading as HuggingFace model directory (handles sharded files automatically)
                 model = AutoModelForCausalLM.from_pretrained(
                     load_peft_checkpoint,
                     torch_dtype=torch.bfloat16,
@@ -318,12 +325,7 @@ def get_model(
                 for _, param in model.named_parameters():
                     param.requires_grad = enable_full_finetuning
             else:
-                # Load state dict into existing model
-                state_dict = torch.load(checkpoint_path, map_location="cpu")
-                model.load_state_dict(state_dict, strict=False)
-                # Set parameter gradients based on intended use
-                for _, param in model.named_parameters():
-                    param.requires_grad = enable_full_finetuning
+                raise ValueError(f"No valid model files found in {load_peft_checkpoint}")
             use_peft = False
 
     # Distribute models
