@@ -233,19 +233,19 @@ def per_layer_loss(args, decoder_model, tokenizer, **kwargs):
         try:
             # Test if model.layers exists (direct model access)
             layers = model.model.layers
-            print(f"Debug: Using {model_name}.model")
+            print(f"Debug: Using {model_name}.model - SUCCESS!")
             return model.model
         except AttributeError:
             try:
                 # Test if model.model.layers exists (PEFT structure)
                 layers = model.model.model.layers
-                print(f"Debug: Using {model_name}.model.model")
+                print(f"Debug: Using {model_name}.model.model - SUCCESS!")
                 return model.model.model
             except AttributeError:
                 try:
                     # Test if module.model.model.layers exists (distributed wrapper)
                     layers = model.module.model.model.layers
-                    print(f"Debug: Using {model_name}.module.model.model")
+                    print(f"Debug: Using {model_name}.module.model.model - SUCCESS!")
                     return model.module.model.model
                 except AttributeError:
                     raise AttributeError(f"Cannot find layers in {model_name} - unsupported model structure")
@@ -254,12 +254,14 @@ def per_layer_loss(args, decoder_model, tokenizer, **kwargs):
     target_layers_obj = get_model_layers(target_model, "target_model")
     
     module_write = [decoder_layers_obj.layers[0]]
+    print(f"Debug: Creating optimizers for layers: {args.layers_to_optimize}")
     l_to_optimizer = {
         layer: torch.optim.Adam(
             target_layers_obj.layers[layer].parameters(), lr=args.lr
         )
         for layer in args.layers_to_optimize
     }
+    print(f"Debug: Optimizers created successfully!")
     dataset = get_dataset(args, tokenizer, qa_per_layer=args.qa_per_layer)
 
     losses = []
