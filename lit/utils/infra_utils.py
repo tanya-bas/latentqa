@@ -359,33 +359,33 @@ def get_model(
                 loaded_successfully = False
                 
                 if has_index or has_single_file:
-                # Try loading as HuggingFace model directory (handles sharded files automatically)
-                try:
-                    model = AutoModelForCausalLM.from_pretrained(
-                        load_peft_checkpoint,
-                        torch_dtype=torch.bfloat16,
-                        use_cache=None,
-                        device_map="auto" if device == "auto" else None,
-                    )
-                    # Re-resize token embeddings
-                    model.resize_token_embeddings(len(tokenizer))
-                    # Set parameter gradients based on intended use
-                    for _, param in model.named_parameters():
-                        param.requires_grad = enable_full_finetuning
-                    loaded_successfully = True
-                except Exception as e:
-                    print(f"Failed to load as HuggingFace model directory: {e}")
-                    if not sharded_files:
-                        raise e
-                    # Continue to try sharded loading below
-            
-            if not loaded_successfully and sharded_files:
-                # We have sharded files but no index - create the missing index file
-                print(f"Found sharded files but no index file. Creating index file...")
+                    # Try loading as HuggingFace model directory (handles sharded files automatically)
+                    try:
+                        model = AutoModelForCausalLM.from_pretrained(
+                            load_peft_checkpoint,
+                            torch_dtype=torch.bfloat16,
+                            use_cache=None,
+                            device_map="auto" if device == "auto" else None,
+                        )
+                        # Re-resize token embeddings
+                        model.resize_token_embeddings(len(tokenizer))
+                        # Set parameter gradients based on intended use
+                        for _, param in model.named_parameters():
+                            param.requires_grad = enable_full_finetuning
+                        loaded_successfully = True
+                    except Exception as e:
+                        print(f"Failed to load as HuggingFace model directory: {e}")
+                        if not sharded_files:
+                            raise e
+                        # Continue to try sharded loading below
                 
-                try:
-                    from safetensors import safe_open
-                    import json
+                if not loaded_successfully and sharded_files:
+                    # We have sharded files but no index - create the missing index file
+                    print(f"Found sharded files but no index file. Creating index file...")
+                    
+                    try:
+                        from safetensors import safe_open
+                        import json
                     
                     # Create weight map and metadata
                     weight_map = {}
