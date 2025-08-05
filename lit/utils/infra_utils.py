@@ -114,16 +114,16 @@ def save_model(decoder_model, ema_model, tokenizer, args, epoch, steps, logger, 
     ]:
         if model is None:
             continue
-        
+
         if rank == 0:
             # Get the unwrapped model (remove FSDP/DDP wrappers)
-            if hasattr(model, 'module'):
+            if hasattr(model, "module"):
                 unwrapped_model = model.module
             else:
                 unwrapped_model = model
-            
+
             # Check if this is a PEFT (LoRA) model or full model
-            if hasattr(unwrapped_model, 'peft_config'):
+            if hasattr(unwrapped_model, "peft_config"):
                 # This is a PEFT model - save the adapter only
                 unwrapped_model.save_pretrained(dir)
             else:
@@ -131,7 +131,7 @@ def save_model(decoder_model, ema_model, tokenizer, args, epoch, steps, logger, 
                 options = StateDictOptions(full_state_dict=True, cpu_offload=True)
                 state_dict = get_model_state_dict(model, options=options)
                 unwrapped_model.save_pretrained(dir, state_dict=state_dict)
-            
+
             tokenizer.save_pretrained(dir)
             logger.info(f"{name} is saved in {dir} directory")
 
@@ -305,8 +305,9 @@ def get_model(
     elif load_peft_checkpoint is not None:
         # Check if this is a local directory or HuggingFace model name
         import os
+
         is_local_path = os.path.exists(load_peft_checkpoint)
-        
+
         if not is_local_path:
             # This is a HuggingFace model name - load it directly
             print(f"Loading HuggingFace model: {load_peft_checkpoint}")
@@ -327,37 +328,48 @@ def get_model(
             use_peft = False
         else:
             # This is a local checkpoint - check if it contains LoRA adapters
-            adapter_config_path = os.path.join(load_peft_checkpoint, "adapter_config.json")
+            adapter_config_path = os.path.join(
+                load_peft_checkpoint, "adapter_config.json"
+            )
             if os.path.exists(adapter_config_path):
                 # print(f"[Config is NONE] Loading PEFT checkpoint from {load_peft_checkpoint}")
                 model = PeftModel.from_pretrained(model, load_peft_checkpoint)
             else:
                 # This is a full model checkpoint, load the state dict
                 print(f"Loading full model checkpoint from {load_peft_checkpoint}")
-                checkpoint_path = os.path.join(load_peft_checkpoint, "pytorch_model.bin")
+                checkpoint_path = os.path.join(
+                    load_peft_checkpoint, "pytorch_model.bin"
+                )
                 if not os.path.exists(checkpoint_path):
                     checkpoint_path = os.path.join(
                         load_peft_checkpoint, "model.safetensors"
                     )
-                
+
                 # Check for index files that indicate sharded models
                 index_files = [
                     "pytorch_model.bin.index.json",
-                    "model.safetensors.index.json"
+                    "model.safetensors.index.json",
                 ]
-                
+
                 # Check for sharded model files
                 sharded_files = []
                 for filename in os.listdir(load_peft_checkpoint):
-                    if filename.startswith("model-") and filename.endswith(".safetensors"):
+                    if filename.startswith("model-") and filename.endswith(
+                        ".safetensors"
+                    ):
                         sharded_files.append(filename)
-                
-                has_index = any(os.path.exists(os.path.join(load_peft_checkpoint, idx)) for idx in index_files)
-                has_single_file = os.path.exists(checkpoint_path) or os.path.exists(os.path.join(load_peft_checkpoint, "pytorch_model.bin"))
-                
+
+                has_index = any(
+                    os.path.exists(os.path.join(load_peft_checkpoint, idx))
+                    for idx in index_files
+                )
+                has_single_file = os.path.exists(checkpoint_path) or os.path.exists(
+                    os.path.join(load_peft_checkpoint, "pytorch_model.bin")
+                )
+
                 # Try different loading strategies
                 loaded_successfully = False
-                
+
                 if has_index or has_single_file:
                     # Try loading as HuggingFace model directory (handles sharded files automatically)
                     try:
@@ -378,47 +390,57 @@ def get_model(
                         if not sharded_files:
                             raise e
                         # Continue to try sharded loading below
-                
+
                 if not loaded_successfully and sharded_files:
                     # We have sharded files but no index - create the missing index file
-                    print(f"Found sharded files but no index file. Creating index file...")
-                    
+                    print(
+                        f"Found sharded files but no index file. Creating index file..."
+                    )
+
                     try:
                         from safetensors import safe_open
                         import json
-                        
+
                         # Create weight map and metadata
                         weight_map = {}
                         total_size = 0
-                        
+
                         for shard_file in sorted(sharded_files):
                             shard_path = os.path.join(load_peft_checkpoint, shard_file)
                             try:
-                                with safe_open(shard_path, framework="pt", device="cpu") as f:
+                                with safe_open(
+                                    shard_path, framework="pt", device="cpu"
+                                ) as f:
                                     for key in f.keys():
                                         weight_map[key] = shard_file
                                         # Try to get tensor info for size calculation
                                         try:
                                             tensor = f.get_tensor(key)
-                                            total_size += tensor.numel() * tensor.element_size()
+                                            total_size += (
+                                                tensor.numel() * tensor.element_size()
+                                            )
                                         except:
                                             pass  # Skip size calculation if it fails
                             except Exception as e:
-                                print(f"Warning: Could not read shard {shard_file}: {e}")
+                                print(
+                                    f"Warning: Could not read shard {shard_file}: {e}"
+                                )
                                 continue
-                        
+
                         # Create the index file
                         index_data = {
                             "metadata": {"total_size": total_size},
-                            "weight_map": weight_map
+                            "weight_map": weight_map,
                         }
-                        
-                        index_path = os.path.join(load_peft_checkpoint, "model.safetensors.index.json")
-                        with open(index_path, 'w') as f:
+
+                        index_path = os.path.join(
+                            load_peft_checkpoint, "model.safetensors.index.json"
+                        )
+                        with open(index_path, "w") as f:
                             json.dump(index_data, f, indent=2)
-                        
+
                         print(f"Created index file: {index_path}")
-                        
+
                         # Now try loading with the index file
                         model = AutoModelForCausalLM.from_pretrained(
                             load_peft_checkpoint,
@@ -431,22 +453,30 @@ def get_model(
                         # Set parameter gradients based on intended use
                         for _, param in model.named_parameters():
                             param.requires_grad = enable_full_finetuning
-                        
-                except Exception as e:
-                    print(f"Failed to create index file or load model: {e}")
-                    # Fallback: try to use torch.load on the first shard as a regular checkpoint
-                    try:
-                        first_shard = os.path.join(load_peft_checkpoint, sorted(sharded_files)[0])
-                        print(f"Attempting to load first shard as single checkpoint: {first_shard}")
-                        state_dict = torch.load(first_shard, map_location="cpu")
-                        model.load_state_dict(state_dict, strict=False)
-                        for _, param in model.named_parameters():
-                            param.requires_grad = enable_full_finetuning
-                    except Exception as e2:
-                        raise ValueError(f"Could not load sharded checkpoint: {e}, fallback failed: {e2}")
-            
+
+                    except Exception as e:
+                        print(f"Failed to create index file or load model: {e}")
+                        # Fallback: try to use torch.load on the first shard as a regular checkpoint
+                        try:
+                            first_shard = os.path.join(
+                                load_peft_checkpoint, sorted(sharded_files)[0]
+                            )
+                            print(
+                                f"Attempting to load first shard as single checkpoint: {first_shard}"
+                            )
+                            state_dict = torch.load(first_shard, map_location="cpu")
+                            model.load_state_dict(state_dict, strict=False)
+                            for _, param in model.named_parameters():
+                                param.requires_grad = enable_full_finetuning
+                        except Exception as e2:
+                            raise ValueError(
+                                f"Could not load sharded checkpoint: {e}, fallback failed: {e2}"
+                            )
+
             if not loaded_successfully and not sharded_files:
-                raise ValueError(f"No valid model files found in {load_peft_checkpoint}")
+                raise ValueError(
+                    f"No valid model files found in {load_peft_checkpoint}"
+                )
             use_peft = False
 
     # Distribute models
