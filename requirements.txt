@@ -8,3 +8,4 @@ transformers==4.46.2
 tqdm
 wandb
 datasets
+safetensors

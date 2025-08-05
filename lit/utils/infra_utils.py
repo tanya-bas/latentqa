@@ -334,29 +334,70 @@ def get_model(
                 for _, param in model.named_parameters():
                     param.requires_grad = enable_full_finetuning
             elif sharded_files:
-                # We have sharded files but no index - this might be a checkpoint saved incorrectly
-                # Try to load the shards manually using safetensors
-                from safetensors import safe_open
-                print(f"Found sharded files but no index file. Attempting manual loading...")
+                # We have sharded files but no index - create the missing index file
+                print(f"Found sharded files but no index file. Creating index file...")
                 
-                # Load all shards into a single state dict
-                state_dict = {}
-                for shard_file in sorted(sharded_files):
-                    shard_path = os.path.join(load_peft_checkpoint, shard_file)
-                    with safe_open(shard_path, framework="pt", device="cpu") as f:
-                        for key in f.keys():
-                            state_dict[key] = f.get_tensor(key)
-                
-                # Load state dict into the existing model
-                missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
-                if missing_keys:
-                    print(f"Warning: Missing keys when loading checkpoint: {missing_keys}")
-                if unexpected_keys:
-                    print(f"Warning: Unexpected keys when loading checkpoint: {unexpected_keys}")
-                
-                # Set parameter gradients based on intended use
-                for _, param in model.named_parameters():
-                    param.requires_grad = enable_full_finetuning
+                try:
+                    from safetensors import safe_open
+                    import json
+                    
+                    # Create weight map and metadata
+                    weight_map = {}
+                    total_size = 0
+                    
+                    for shard_file in sorted(sharded_files):
+                        shard_path = os.path.join(load_peft_checkpoint, shard_file)
+                        try:
+                            with safe_open(shard_path, framework="pt", device="cpu") as f:
+                                for key in f.keys():
+                                    weight_map[key] = shard_file
+                                    # Try to get tensor info for size calculation
+                                    try:
+                                        tensor = f.get_tensor(key)
+                                        total_size += tensor.numel() * tensor.element_size()
+                                    except:
+                                        pass  # Skip size calculation if it fails
+                        except Exception as e:
+                            print(f"Warning: Could not read shard {shard_file}: {e}")
+                            continue
+                    
+                    # Create the index file
+                    index_data = {
+                        "metadata": {"total_size": total_size},
+                        "weight_map": weight_map
+                    }
+                    
+                    index_path = os.path.join(load_peft_checkpoint, "model.safetensors.index.json")
+                    with open(index_path, 'w') as f:
+                        json.dump(index_data, f, indent=2)
+                    
+                    print(f"Created index file: {index_path}")
+                    
+                    # Now try loading with the index file
+                    model = AutoModelForCausalLM.from_pretrained(
+                        load_peft_checkpoint,
+                        torch_dtype=torch.bfloat16,
+                        use_cache=None,
+                        device_map="auto" if device == "auto" else None,
+                    )
+                    # Re-resize token embeddings
+                    model.resize_token_embeddings(len(tokenizer))
+                    # Set parameter gradients based on intended use
+                    for _, param in model.named_parameters():
+                        param.requires_grad = enable_full_finetuning
+                        
+                except Exception as e:
+                    print(f"Failed to create index file or load model: {e}")
+                    # Fallback: try to use torch.load on the first shard as a regular checkpoint
+                    try:
+                        first_shard = os.path.join(load_peft_checkpoint, sorted(sharded_files)[0])
+                        print(f"Attempting to load first shard as single checkpoint: {first_shard}")
+                        state_dict = torch.load(first_shard, map_location="cpu")
+                        model.load_state_dict(state_dict, strict=False)
+                        for _, param in model.named_parameters():
+                            param.requires_grad = enable_full_finetuning
+                    except Exception as e2:
+                        raise ValueError(f"Could not load sharded checkpoint: {e}, fallback failed: {e2}")
             else:
                 raise ValueError(f"No valid model files found in {load_peft_checkpoint}")
             use_peft = False
