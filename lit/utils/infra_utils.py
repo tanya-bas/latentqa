@@ -201,7 +201,16 @@ def get_tokenizer(model_name):
     tokenizer = AutoTokenizer.from_pretrained(
         model_name, padding_side="left", add_eos_token=True
     )
-    tokenizer.pad_token_id = PAD_TOKEN_IDS[model_name]
+    
+    # Handle models not in PAD_TOKEN_IDS
+    if model_name in PAD_TOKEN_IDS:
+        tokenizer.pad_token_id = PAD_TOKEN_IDS[model_name]
+    else:
+        # Use default pad token for unsupported models
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        print(f"Warning: Model {model_name} not in PAD_TOKEN_IDS, using default pad token: {tokenizer.pad_token}")
+    
     if "distill-qwen" in model_name.lower():
         tokenizer.add_tokens(["<|reserved_special_token_8|>"])
     return tokenizer

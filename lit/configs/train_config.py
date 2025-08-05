@@ -5,7 +5,7 @@ from typing import Optional
 @dataclass
 class train_config:
     # Model and dataset
-    target_model_name: str = "MODEL_NAME"
+    target_model_name: str = "microsoft/DialoGPT-medium"  # Publicly available model
     load_model_checkpoint: str = ""    
     train_system: str = ""
     train_stimulus_completion: str = ""
@@ -47,7 +47,7 @@ class train_config:
     num_layers_to_sample: int = 1
 
     # Training args
-    batch_size_training: int = 4
+    batch_size_training: int = 2  # Reduced batch size for memory
     gradient_accumulation_steps: int = 1
     gradient_clipping: bool = False
     gradient_clipping_threshold: float = 1.0
@@ -63,4 +63,13 @@ class train_config:
     peft_method: str = "lora"
     use_peft: bool = True
     use_fsdp: bool = False
+    
+    # Constitutional AI parameters
+    constitutional_alpha: float = 0.3
+    use_simple_critique: bool = False
+    constitutional_evaluation: bool = True
+    
+    # Memory optimization parameters
+    use_cpu_offload: bool = False
+    max_memory_usage: float = 0.8  # Use 80% of GPU memory max
     
