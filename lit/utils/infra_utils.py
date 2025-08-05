@@ -114,10 +114,24 @@ def save_model(decoder_model, ema_model, tokenizer, args, epoch, steps, logger, 
     ]:
         if model is None:
             continue
-        options = StateDictOptions(full_state_dict=True, cpu_offload=True)
-        state_dict = get_model_state_dict(model, options=options)
+        
         if rank == 0:
-            model.save_pretrained(dir, state_dict=state_dict)
+            # Get the unwrapped model (remove FSDP/DDP wrappers)
+            if hasattr(model, 'module'):
+                unwrapped_model = model.module
+            else:
+                unwrapped_model = model
+            
+            # Check if this is a PEFT (LoRA) model or full model
+            if hasattr(unwrapped_model, 'peft_config'):
+                # This is a PEFT model - save the adapter only
+                unwrapped_model.save_pretrained(dir)
+            else:
+                # This is a full model (SFT) - use FSDP-aware saving
+                options = StateDictOptions(full_state_dict=True, cpu_offload=True)
+                state_dict = get_model_state_dict(model, options=options)
+                unwrapped_model.save_pretrained(dir, state_dict=state_dict)
+            
             tokenizer.save_pretrained(dir)
             logger.info(f"{name} is saved in {dir} directory")
 
