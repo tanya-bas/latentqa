@@ -95,6 +95,7 @@ def main(**kwargs):
         args.target_model_name,
         tokenizer,
         peft_config=peft_config,
+        load_peft_checkpoint=args.load_model_checkpoint if args.load_model_checkpoint else None,
         fsdp_args=fsdp_args,
         device=device,
         rank=rank,
