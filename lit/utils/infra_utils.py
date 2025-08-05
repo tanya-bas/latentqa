@@ -305,13 +305,22 @@ def get_model(
                     load_peft_checkpoint, "model.safetensors"
                 )
             
+            # Check for index files that indicate sharded models
+            index_files = [
+                "pytorch_model.bin.index.json",
+                "model.safetensors.index.json"
+            ]
+            
             # Check for sharded model files
             sharded_files = []
             for filename in os.listdir(load_peft_checkpoint):
                 if filename.startswith("model-") and filename.endswith(".safetensors"):
                     sharded_files.append(filename)
             
-            if sharded_files or os.path.exists(checkpoint_path) or os.path.exists(os.path.join(load_peft_checkpoint, "pytorch_model.bin")):
+            has_index = any(os.path.exists(os.path.join(load_peft_checkpoint, idx)) for idx in index_files)
+            has_single_file = os.path.exists(checkpoint_path) or os.path.exists(os.path.join(load_peft_checkpoint, "pytorch_model.bin"))
+            
+            if has_index or has_single_file:
                 # Try loading as HuggingFace model directory (handles sharded files automatically)
                 model = AutoModelForCausalLM.from_pretrained(
                     load_peft_checkpoint,
@@ -321,6 +330,30 @@ def get_model(
                 )
                 # Re-resize token embeddings
                 model.resize_token_embeddings(len(tokenizer))
+                # Set parameter gradients based on intended use
+                for _, param in model.named_parameters():
+                    param.requires_grad = enable_full_finetuning
+            elif sharded_files:
+                # We have sharded files but no index - this might be a checkpoint saved incorrectly
+                # Try to load the shards manually using safetensors
+                from safetensors import safe_open
+                print(f"Found sharded files but no index file. Attempting manual loading...")
+                
+                # Load all shards into a single state dict
+                state_dict = {}
+                for shard_file in sorted(sharded_files):
+                    shard_path = os.path.join(load_peft_checkpoint, shard_file)
+                    with safe_open(shard_path, framework="pt", device="cpu") as f:
+                        for key in f.keys():
+                            state_dict[key] = f.get_tensor(key)
+                
+                # Load state dict into the existing model
+                missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
+                if missing_keys:
+                    print(f"Warning: Missing keys when loading checkpoint: {missing_keys}")
+                if unexpected_keys:
+                    print(f"Warning: Unexpected keys when loading checkpoint: {unexpected_keys}")
+                
                 # Set parameter gradients based on intended use
                 for _, param in model.named_parameters():
                     param.requires_grad = enable_full_finetuning
