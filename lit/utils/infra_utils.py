@@ -272,7 +272,7 @@ def get_model(
             device_map="auto" if device == "auto" else None,
         )
     model.resize_token_embeddings(len(tokenizer))
-    
+
     # Set parameter gradients based on training method
     if enable_full_finetuning:
         # For SFT (supervised fine-tuning), enable gradients for all parameters
@@ -289,7 +289,42 @@ def get_model(
     if peft_config is not None:
         model = get_peft_model(model, peft_config)
     elif load_peft_checkpoint is not None:
-        model = PeftModel.from_pretrained(model, load_peft_checkpoint)
+        # Check if the checkpoint contains LoRA adapters
+        import os
+
+        adapter_config_path = os.path.join(load_peft_checkpoint, "adapter_config.json")
+        if os.path.exists(adapter_config_path):
+            # print(f"[Config is NONE] Loading PEFT checkpoint from {load_peft_checkpoint}")
+            model = PeftModel.from_pretrained(model, load_peft_checkpoint)
+        else:
+            # This is a full model checkpoint, load the state dict
+            print(f"Loading full model checkpoint from {load_peft_checkpoint}")
+            checkpoint_path = os.path.join(load_peft_checkpoint, "pytorch_model.bin")
+            if not os.path.exists(checkpoint_path):
+                checkpoint_path = os.path.join(
+                    load_peft_checkpoint, "model.safetensors"
+                )
+            if not os.path.exists(checkpoint_path):
+                # Try loading as HuggingFace model directory
+                model = AutoModelForCausalLM.from_pretrained(
+                    load_peft_checkpoint,
+                    torch_dtype=torch.bfloat16,
+                    use_cache=None,
+                    device_map="auto" if device == "auto" else None,
+                )
+                # Re-resize token embeddings
+                model.resize_token_embeddings(len(tokenizer))
+                # Set parameter gradients based on intended use
+                for _, param in model.named_parameters():
+                    param.requires_grad = enable_full_finetuning
+            else:
+                # Load state dict into existing model
+                state_dict = torch.load(checkpoint_path, map_location="cpu")
+                model.load_state_dict(state_dict, strict=False)
+                # Set parameter gradients based on intended use
+                for _, param in model.named_parameters():
+                    param.requires_grad = enable_full_finetuning
+            use_peft = False
 
     # Distribute models
     if fsdp_args is None:
@@ -316,7 +351,7 @@ def get_model(
             DECODER_LAYER = MistralDecoderLayer
         elif "qwen2" in model_name:
             DECODER_LAYER = Qwen2DecoderLayer
-            
+
         wrapping_policy = partial(
             transformer_auto_wrap_policy,
             transformer_layer_cls={
