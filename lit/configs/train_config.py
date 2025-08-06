@@ -69,6 +69,9 @@ class train_config:
     use_simple_critique: bool = False
     constitutional_evaluation: bool = True
     
+    # Dataset size limit for faster training
+    max_samples: Optional[int] = None  # Set to a number like 1000 for faster training
+    
     # Memory optimization parameters
     use_cpu_offload: bool = False
     max_memory_usage: float = 0.8  # Use 80% of GPU memory max

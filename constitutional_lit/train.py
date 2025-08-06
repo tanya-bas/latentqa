@@ -39,9 +39,24 @@ from lit.utils.infra_utils import (
 )
 from lit.utils.activation_utils import latent_qa
 
-def get_dataloaders_simple(train_config, tokenizer):
+def get_dataloaders_simple(train_config, tokenizer, max_samples=None):
     """Get dataloaders without distributed training."""
     dataset_train = get_dataset(train_config, tokenizer, train=True)
+    
+    # Limit dataset size for faster training
+    if max_samples is not None and max_samples > 0:
+        print(f"Limiting dataset to {max_samples} samples for faster training")
+        # Create a subset of the dataset while preserving the lengths attribute
+        indices = torch.randperm(len(dataset_train))[:max_samples]
+        
+        # Create a custom subset that preserves the lengths attribute
+        class SubsetWithLengths(torch.utils.data.Subset):
+            def __init__(self, dataset, indices):
+                super().__init__(dataset, indices)
+                # Preserve the lengths attribute from the original dataset
+                self.lengths = [dataset.lengths[i] for i in indices]
+        
+        dataset_train = SubsetWithLengths(dataset_train, indices)
     
     # Use simple batch sampler instead of distributed
     batch_sampler = LengthBasedBatchSampler(
@@ -479,7 +494,7 @@ class ConstitutionalLatentQATrainer:
             
         # Load tokenizer and datasets
         tokenizer = get_tokenizer(self.args.target_model_name)
-        train_dataloader, eval_dataloader = get_dataloaders_simple(self.args, tokenizer)
+        train_dataloader, eval_dataloader = get_dataloaders_simple(self.args, tokenizer, max_samples=self.args.max_samples)
         
         # Setup models
         self.setup_models(tokenizer)
