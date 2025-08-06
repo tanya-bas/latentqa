@@ -22,6 +22,7 @@ NUM_READ_TOKENS_TO_SHIFT = {
     "mistralai/Mistral-Small-24B-Instruct-2501": 2,
     "deepseek-ai/DeepSeek-R1-Distill-Llama-8B": 2,
     "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B": 2,
+    "openai/gpt-oss-20b": 1,
 }
 
 # Magic numbers that are the length of the user tag + BOS token
@@ -33,6 +34,7 @@ NUM_WRITE_TOKENS_TO_SHIFT = {
     "mistralai/Mistral-Small-24B-Instruct-2501": 2,
     "deepseek-ai/DeepSeek-R1-Distill-Llama-8B": 2,
     "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B": 2,
+    "openai/gpt-oss-20b": 3,
 }
 
 PAD_TOKEN_IDS = {
@@ -43,6 +45,7 @@ PAD_TOKEN_IDS = {
     "mistralai/Mistral-Small-24B-Instruct-2501": 2,
     "deepseek-ai/DeepSeek-R1-Distill-Llama-8B": 128010,
     "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B": 151643,
+    "openai/gpt-oss-20b": 199999,
 }
 
 # Magic numbers that correspond to the token idxs of the chat format for the models
@@ -88,6 +91,16 @@ CHAT_FORMAT_TOKENS = {
         torch.tensor([151645]),
         torch.tensor([151665]),
     ),
+    "openai/gpt-oss-20b": (
+        199998,  # <|startoftext|> - BOS token
+        torch.tensor([200006, 1428, 200008]),  # <|start|>user<|message|> - User
+        torch.tensor(
+            [200006, 173781, 200008]
+        ),  # <|start|>assistant<|message|> - Assistant
+        torch.tensor(
+            [200006, 76183, 200008]
+        ),  # <|start|>reflect<|message|> - Assistant with reflection
+    ),
 }
 
 # Reasoning models need to encode their thought tokens
@@ -127,7 +140,7 @@ def mask_inputs(
     mask_all_but_last=False,
     modify_chat_template=False,
 ):
-    bos_token,start_tokens, end_tokens_default, end_tokens_modify = CHAT_FORMAT_TOKENS[
+    bos_token, start_tokens, end_tokens_default, end_tokens_modify = CHAT_FORMAT_TOKENS[
         tokenizer_name
     ]
     end_tokens = end_tokens_modify if modify_chat_template else end_tokens_default
@@ -506,7 +519,7 @@ def get_dist_batch_sampler(dataset, train_config, mode):
         # Not in distributed mode, use single GPU settings
         world_size = 1
         rank = 0
-        
+
     return DistributedLengthBasedBatchSampler(
         dataset,
         train_config.batch_size_training,
@@ -594,10 +607,10 @@ def get_dataloaders(train_config, tokenizer):
         use_distributed = True
     except (RuntimeError, ValueError):
         use_distributed = False
-    
+
     # Choose appropriate batch sampler based on distributed mode
     sampler_fn = get_dist_batch_sampler if use_distributed else get_batch_sampler
-    
+
     dataset_train = get_dataset(train_config, tokenizer, train=True)
     train_dataloader = torch.utils.data.DataLoader(
         dataset_train,
