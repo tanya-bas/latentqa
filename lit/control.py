@@ -160,15 +160,15 @@ def get_results(args, model, tokenizer):
             top_p=None,
         )
         for i in range(len(out)):
-            tokenized_input_length = len(tokenized['input_ids'][i])
-            completion = tokenizer.decode(out[i][tokenized_input_length:]).split("<|end_of_text|>", 1)[0]
+            tokenized_input_length = len(tokenized["input_ids"][i])
+            completion = tokenizer.decode(out[i][tokenized_input_length:]).split(
+                "<|end_of_text|>", 1
+            )[0]
             print(f"[PROMPT]: {prompts[i]}")
             print(f"[COMPLETION]: {completion}")
             print("#" * 80)
             completions.append(completion)
-        FOLDER = (
-            f"out/completions/{args.control}_{args.dataset}_samples{args.samples}"
-        )
+        FOLDER = f"out/completions/{args.control}_{args.dataset}_samples{args.samples}"
         if not os.path.exists(FOLDER):
             os.makedirs(FOLDER)
         with open(f"{FOLDER}/{args.eval_prompts}.json", "w") as f:
@@ -256,13 +256,26 @@ def per_layer_loss(args, decoder_model, tokenizer, **kwargs):
             0, inputs_embeds.shape[1], device=inputs_embeds.device
         )
         position_ids = cache_position.unsqueeze(0)
-        causal_mask = target_model.model.model._update_causal_mask(
-            tokenized_read.attention_mask,
-            inputs_embeds,
-            cache_position,
-            past_key_values=None,
-            output_attentions=False,
-        )
+        # Build a generic 4D causal attention mask compatible with decoder layers
+        with torch.no_grad():
+            bsz, q_len = tokenized_read.attention_mask.shape
+            device = inputs_embeds.device
+            dtype = inputs_embeds.dtype
+            # Causal lower-triangular
+            causal = torch.tril(
+                torch.ones((q_len, q_len), device=device, dtype=torch.bool)
+            )
+            # Mask out padding on key side
+            key_pad = tokenized_read.attention_mask.to(torch.bool)[:, None, None, :]
+            allowed = causal[None, None, :, :] & key_pad
+            # Convert to additive mask (0 for allowed, -inf for masked)
+            neg_inf = torch.finfo(dtype).min
+            causal_mask = torch.where(
+                allowed,
+                torch.zeros(1, device=device, dtype=dtype),
+                torch.full((1,), neg_inf, device=device, dtype=dtype),
+            )
+            causal_mask = causal_mask.expand(bsz, 1, q_len, q_len).contiguous()
         hidden_states = inputs_embeds
         position_embeddings = target_model.model.model.rotary_emb(
             hidden_states, position_ids
