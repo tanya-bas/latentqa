@@ -45,7 +45,7 @@ def main(**kwargs):
     else:
         rank = 0
         world_size = 1
-    
+
     assert torch.cuda.is_available()
     args = train_config()
     update_config(args, **kwargs)
@@ -133,6 +133,17 @@ def main(**kwargs):
         for step, batch in enumerate(train_dataloader):
             for key in batch.keys():
                 batch[key] = batch[key].to(rank)
+            # Debug: target-token stats
+            if "tokenized_write" in batch and "labels" in batch["tokenized_write"]:
+                tgt_counts = (batch["tokenized_write"]["labels"] != -100).sum(dim=1)
+                try:
+                    min_t, max_t = tgt_counts.min().item(), tgt_counts.max().item()
+                    mean_t = float(tgt_counts.float().mean())
+                    print(
+                        f"Target tokens per sample - min:{min_t} max:{max_t} mean:{mean_t:.1f}"
+                    )
+                except Exception:
+                    pass
             layer_list = np.random.choice(
                 len(module_read), args.num_layers_to_sample, replace=False
             )
@@ -150,6 +161,11 @@ def main(**kwargs):
                 )
                 loss = outputs.loss
                 loss = loss / args.gradient_accumulation_steps
+                # Skip non-finite loss steps
+                if not torch.isfinite(loss):
+                    print("Non-finite loss detected; skipping step:", float(loss))
+                    optimizer.zero_grad(set_to_none=True)
+                    continue
                 loss.backward()
                 if train_steps % args.gradient_accumulation_steps == 0:
                     if (
@@ -162,7 +178,9 @@ def main(**kwargs):
                         )
                     optimizer.step()
                     optimizer.zero_grad()
-                    model_for_ema = decoder_model.module if use_distributed else decoder_model
+                    model_for_ema = (
+                        decoder_model.module if use_distributed else decoder_model
+                    )
                     update_ema(ema, model_for_ema, decay=args.ema_decay)
                     pbar.update(1)
 
@@ -205,7 +223,7 @@ def main(**kwargs):
                     )
                     total_loss += outputs.loss.detach().float()
                     pbar.update(1)
-                
+
                 if use_distributed:
                     losses = torch.zeros(8).to(f"cuda:{rank}")
                     losses[rank] = total_loss
@@ -217,7 +235,9 @@ def main(**kwargs):
                     dist.gather(losses, gathered_loss, dst=0)
                     if rank == 0 and wandb_run is not None:
                         all_loss = torch.sum(torch.stack(gathered_loss))
-                        all_loss = all_loss / len(eval_dataloader) / dist.get_world_size()
+                        all_loss = (
+                            all_loss / len(eval_dataloader) / dist.get_world_size()
+                        )
                         wandb_run.log(
                             {
                                 "train/epoch": epoch,
@@ -238,7 +258,11 @@ def main(**kwargs):
                         )
 
             if train_steps % args.save_every_n_steps == 0:
-                model_to_save = decoder_model if args.use_fsdp else (decoder_model.module if use_distributed else decoder_model)
+                model_to_save = (
+                    decoder_model
+                    if args.use_fsdp
+                    else (decoder_model.module if use_distributed else decoder_model)
+                )
                 save_model(
                     model_to_save,
                     ema,
@@ -255,7 +279,11 @@ def main(**kwargs):
         pbar.close()
 
         if args.save_model:
-            model_to_save = decoder_model if args.use_fsdp else (decoder_model.module if use_distributed else decoder_model)
+            model_to_save = (
+                decoder_model
+                if args.use_fsdp
+                else (decoder_model.module if use_distributed else decoder_model)
+            )
             save_model(
                 model_to_save,
                 ema,
@@ -271,6 +299,7 @@ def main(**kwargs):
 
     if wandb_run is not None:
         import wandb
+
         wandb.finish()
     if use_distributed:
         dist.destroy_process_group()

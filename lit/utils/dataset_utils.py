@@ -302,6 +302,15 @@ def tokenize(
         tokenized_write["labels"] = tokenized_write.input_ids.clone()
         mask = (tokenized_write.attention_mask == 0) | user_inputs_mask
         tokenized_write["labels"][mask] = IGNORE_IDX
+        # Debug: ensure at least one target token per sample
+        valid_counts = (tokenized_write["labels"] != IGNORE_IDX).sum(dim=1)
+        if (valid_counts == 0).any():
+            bad_idx = torch.nonzero(valid_counts == 0).squeeze(-1).tolist()
+            first = bad_idx[0] if isinstance(bad_idx, list) and bad_idx else 0
+            example = queries[first][:200] if "queries" in locals() else ""
+            raise RuntimeError(
+                f"No target tokens after masking for samples: {bad_idx}. Example (truncated): {example}"
+            )
     return tokenized_batch
 
 
