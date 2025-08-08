@@ -256,6 +256,7 @@ def get_model(
     rank=None,
     distributed_training=False,
     enable_full_finetuning=False,
+    attn_implementation=None,
 ):
     if fsdp_args is not None and fsdp_args.low_cpu_fsdp:
         """
@@ -278,12 +279,20 @@ def get_model(
                     torch_dtype=torch.bfloat16,
                 )
     else:
+        # Avoid forcing FlashAttention by default to prevent version mismatches.
+        # If a specific attention backend is requested, pass it through; otherwise
+        # let Transformers pick a safe default (typically SDPA).
+        pretrained_kwargs = {
+            "torch_dtype": torch.bfloat16,
+            "use_cache": None,
+            "device_map": "auto" if device == "auto" else None,
+        }
+        if attn_implementation is not None:
+            pretrained_kwargs["attn_implementation"] = attn_implementation
+
         model = AutoModelForCausalLM.from_pretrained(
             model_name,
-            attn_implementation="flash_attention_2",
-            torch_dtype=torch.bfloat16,
-            use_cache=None,
-            device_map="auto" if device == "auto" else None,
+            **pretrained_kwargs,
         )
     model.resize_token_embeddings(len(tokenizer))
 
