@@ -142,24 +142,60 @@ def mask_inputs(
     mask_all_but_last=False,
     modify_chat_template=False,
 ):
-    bos_token, start_tokens, end_tokens_default, end_tokens_modify = CHAT_FORMAT_TOKENS[
+    bos_token, start_user, start_assistant, start_reflect = CHAT_FORMAT_TOKENS[
         tokenizer_name
     ]
-    end_tokens = end_tokens_modify if modify_chat_template else end_tokens_default
     batch_size, seq_len = input_ids.shape
     mask = torch.zeros_like(input_ids, dtype=torch.bool)
+
+    # Special robust masking for OpenAI GPT-OSS Harmony format
+    if tokenizer_name == "openai/gpt-oss-20b" and mask_type is None:
+        for b in range(batch_size):
+            # Collect all start markers for user/assistant/reflect
+            def find_all(seq: torch.Tensor):
+                hits = []
+                L = len(seq)
+                for i in range(max(0, seq_len - L + 1)):
+                    if torch.equal(input_ids[b][i : i + L], seq):
+                        hits.append(i)
+                return hits
+
+            idx_user = find_all(start_user)
+            idx_assistant = find_all(start_assistant)
+            idx_reflect = find_all(start_reflect)
+
+            # Prefer last assistant/reflect start; fallback to latest of any known start
+            candidate_starts = []
+            for i in idx_assistant:
+                candidate_starts.append((i, len(start_assistant)))
+            for i in idx_reflect:
+                candidate_starts.append((i, len(start_reflect)))
+
+            if candidate_starts:
+                last_start, start_len = max(candidate_starts, key=lambda x: x[0])
+                mask[b][: last_start + start_len] = True
+            else:
+                # Fallback: use last user start if present; else mask everything
+                if idx_user:
+                    last_user = max(idx_user)
+                    mask[b][: last_user + len(start_user)] = True
+                else:
+                    mask[b][:] = True
+        return mask
+
+    # Default masking logic for non-GPT-OSS models or when mask_type is provided
+    end_tokens = start_reflect if modify_chat_template else start_assistant
     for b in range(batch_size):
         start_idx = []
         end_idx = []
         for i in range(seq_len):
-            if torch.equal(input_ids[b][i : i + len(start_tokens)], start_tokens):
+            if torch.equal(input_ids[b][i : i + len(start_user)], start_user):
                 start_idx.append(i)
             if torch.equal(input_ids[b][i : i + len(end_tokens)], end_tokens):
                 end_idx.append(i)
 
         if mask_type is None:
             if len(start_idx) != len(end_idx):
-                # Data is improperly formatted so mask everything and skip this item
                 mask[b][:] = True
                 continue
 
