@@ -147,7 +147,7 @@ def generate_substitute_layer_single(
         def forward_pre_hook(module, input):
             new_input = input[0] if isinstance(input, tuple) else input
             if "substitute_by_mask" in kwargs:
-                _, read_seq_len, _ = module_activations[idx].shape
+                act = module_activations[idx]
                 _, write_seq_len, _ = new_input.shape
                 for i in range(len(new_input)):
                     read_mask_len = kwargs["substitute_by_mask"][0][i].item()
@@ -156,18 +156,25 @@ def generate_substitute_layer_single(
                     # if the hook called multiple times we are in model.generate()
                     # so we need to increment write_mask_len to account for the new token
                     write_mask_len += num_hook_triggered[idx]
-                    new_input[i] = torch.cat(
-                        [
-                            new_input[i][: write_seq_len - write_mask_len, :],
-                            module_activations[idx][
-                                i, read_seq_len - read_mask_len :, :
+                    if read_mask_len > 0:
+                        if act.dim() == 3:
+                            # Use the last read_mask_len tokens from cached activations
+                            read_seq_len = act.shape[1]
+                            middle = act[i, read_seq_len - read_mask_len :, :]
+                        else:
+                            # Broadcast single hidden to the needed length
+                            middle = act[i].unsqueeze(0).expand(read_mask_len, -1)
+                        new_input[i] = torch.cat(
+                            [
+                                new_input[i][: write_seq_len - write_mask_len, :],
+                                middle,
+                                new_input[i][
+                                    write_seq_len - (write_mask_len - read_mask_len) :,
+                                    :,
+                                ],
                             ],
-                            new_input[i][
-                                write_seq_len - (write_mask_len - read_mask_len) :, :
-                            ],
-                        ],
-                        dim=0,
-                    )
+                            dim=0,
+                        )
             else:
                 new_activations = module_activations[idx].expand(-1, len(token_idx), -1)
                 assert new_input[:, token_idx, :].shape == new_activations.shape
@@ -181,25 +188,30 @@ def generate_substitute_layer_single(
         def forward_hook(module, input, output):
             new_output = output[0] if isinstance(output, tuple) else output
             if "substitute_by_mask" in kwargs:
-                _, read_seq_len, _ = module_activations[idx].shape
+                act = module_activations[idx]
                 _, write_seq_len, _ = new_output.shape
                 for i in range(len(new_output)):
                     read_mask_len = kwargs["substitute_by_mask"][0][i].item()
                     write_mask_len = kwargs["substitute_by_mask"][1][i].item()
                     # same as line 87
                     write_mask_len += num_hook_triggered[idx]
-                    new_output[i] = torch.cat(
-                        [
-                            new_output[i][: write_seq_len - write_mask_len, :],
-                            module_activations[idx][
-                                i, read_seq_len - read_mask_len :, :
+                    if read_mask_len > 0:
+                        if act.dim() == 3:
+                            read_seq_len = act.shape[1]
+                            middle = act[i, read_seq_len - read_mask_len :, :]
+                        else:
+                            middle = act[i].unsqueeze(0).expand(read_mask_len, -1)
+                        new_output[i] = torch.cat(
+                            [
+                                new_output[i][: write_seq_len - write_mask_len, :],
+                                middle,
+                                new_output[i][
+                                    write_seq_len - (write_mask_len - read_mask_len) :,
+                                    :,
+                                ],
                             ],
-                            new_output[i][
-                                write_seq_len - (write_mask_len - read_mask_len) :, :
-                            ],
-                        ],
-                        dim=0,
-                    )
+                            dim=0,
+                        )
             else:
                 new_activations = module_activations[idx].expand(-1, len(token_idx), -1)
                 assert new_output[:, token_idx, :].shape == new_activations.shape
