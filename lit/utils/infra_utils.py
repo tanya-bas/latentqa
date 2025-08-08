@@ -265,7 +265,7 @@ def get_model(
     else:
         model = AutoModelForCausalLM.from_pretrained(
             model_name,
-            attn_implementation="flash_attention_2",
+            attn_implementation="sdpa",
             torch_dtype=torch.bfloat16,
             use_cache=None,
             device_map="auto" if device == "auto" else None,
@@ -307,7 +307,7 @@ def get_model(
             DECODER_LAYER = MistralDecoderLayer
         elif "qwen2" in model_name:
             DECODER_LAYER = Qwen2DecoderLayer
-            
+
         wrapping_policy = partial(
             transformer_auto_wrap_policy,
             transformer_layer_cls={
