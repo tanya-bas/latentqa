@@ -346,6 +346,8 @@ def get_model(
             else:
                 # This is a full model checkpoint, load the state dict
                 print(f"Loading full model checkpoint from {load_peft_checkpoint}")
+                # Track outcome across multiple fallback strategies
+                loaded_successfully = False
                 checkpoint_path = os.path.join(
                     load_peft_checkpoint, "pytorch_model.bin"
                 )
@@ -377,7 +379,6 @@ def get_model(
                 )
 
                 # Try different loading strategies
-                loaded_successfully = False
 
                 if has_index or has_single_file:
                     # Try loading as HuggingFace model directory (handles sharded files automatically)
@@ -462,6 +463,7 @@ def get_model(
                         # Set parameter gradients based on intended use
                         for _, param in model.named_parameters():
                             param.requires_grad = enable_full_finetuning
+                        loaded_successfully = True
 
                     except Exception as e:
                         print(f"Failed to create index file or load model: {e}")
@@ -477,15 +479,16 @@ def get_model(
                             model.load_state_dict(state_dict, strict=False)
                             for _, param in model.named_parameters():
                                 param.requires_grad = enable_full_finetuning
+                            loaded_successfully = True
                         except Exception as e2:
                             raise ValueError(
                                 f"Could not load sharded checkpoint: {e}, fallback failed: {e2}"
                             )
-
-            if not loaded_successfully and not sharded_files:
-                raise ValueError(
-                    f"No valid model files found in {load_peft_checkpoint}"
-                )
+                # After attempting all strategies, if still not loaded and no shards, error out
+                if not loaded_successfully and not sharded_files:
+                    raise ValueError(
+                        f"No valid model files found in {load_peft_checkpoint}"
+                    )
             use_peft = False
 
     # Distribute models
