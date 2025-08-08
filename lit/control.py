@@ -277,9 +277,6 @@ def per_layer_loss(args, decoder_model, tokenizer, **kwargs):
             )
             causal_mask = causal_mask.expand(bsz, 1, q_len, q_len).contiguous()
         hidden_states = inputs_embeds
-        position_embeddings = target_model.model.model.rotary_emb(
-            hidden_states, position_ids
-        )
 
         for l_idx, decoder_layer in enumerate(target_model.model.model.layers):
             layer_outputs = decoder_layer(
@@ -288,7 +285,7 @@ def per_layer_loss(args, decoder_model, tokenizer, **kwargs):
                 position_ids=position_ids,
                 past_key_value=None,
                 cache_position=cache_position,
-                position_embeddings=position_embeddings,
+                position_embeddings=None,
             )
             hidden_states = layer_outputs[0]
             if l_idx in l_to_optimizer:
