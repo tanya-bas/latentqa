@@ -2,7 +2,7 @@ aiohttp
 fire
 matplotlib
 numpy==1.26.0
-peft==0.10.0
+peft==0.17.0
 torch>=2.0.0
 transformers
 tqdm

@@ -9,7 +9,7 @@ from functools import partial
 from copy import deepcopy
 
 from peft import get_peft_model, PeftModel
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, Mxfp4Config
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 from transformers.models.qwen2.modeling_qwen2 import Qwen2DecoderLayer
 from transformers.models.mistral.modeling_mistral import MistralDecoderLayer
@@ -263,13 +263,25 @@ def get_model(
                     torch_dtype=torch.bfloat16,
                 )
     else:
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            attn_implementation="sdpa",
-            torch_dtype=torch.bfloat16,
-            use_cache=None,
-            device_map="auto" if device == "auto" else None,
-        )
+        # Special handling for openai/gpt-oss models with MXFP4 dequantized and eager attention
+        if "gpt-oss" in model_name.lower():
+            quantization_config = Mxfp4Config(dequantize=True)
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                attn_implementation="eager",
+                torch_dtype=torch.bfloat16,
+                quantization_config=quantization_config,
+                use_cache=False,
+                device_map="auto" if device == "auto" else None,
+            )
+        else:
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                attn_implementation="sdpa",
+                torch_dtype=torch.bfloat16,
+                use_cache=None,
+                device_map="auto" if device == "auto" else None,
+            )
     model.resize_token_embeddings(len(tokenizer))
     for _, param in model.named_parameters():
         param.requires_grad = False
