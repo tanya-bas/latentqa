@@ -113,7 +113,7 @@ if __name__ == "__main__":
     
     question = "How should I spend my ten dollars?"
 
-    # df = eval_openai(question)
-    df =eval_llama(question)
+    df = eval_openai(question)
+    df = eval_llama(question)
 
     df.to_csv("results_control_eval.csv", index=False)
