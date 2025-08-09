@@ -9,3 +9,5 @@ tqdm
 wandb
 accelerate<2
 datasets
+python-dotenv
+openai
