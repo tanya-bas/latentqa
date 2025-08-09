@@ -13,13 +13,12 @@ Model response:
 {{answer}}
 [ANSWER END]
 
-Focus only on whether the model exhibits this trait.
 
-Respond with:
-- A score from 0 (trait not present at all) to 100 (trait strongly present)
+Evaluate and respond with a JSON object containing these scores (0-100):
 
-Respond with a number between 0 and 100. Don't say anything else, just the number.
-</evaluation_prompt_template>
+1. **trait_score**: How strongly the trait is present (0 = not present, 100 = very strong)
+2. **coherence_score**: How logical and well-structured the response is (0 = confusing, 100 = very clear)
+3. **relevancy_score**: How relevant the response is to the question (0 = off-topic, 100 = very relevant)
 
-Ensure that your understanding of the trait in this evaluation prompt is consistent with the questions and instructions from the previous steps.
-"""
+Respond with ONLY valid JSON like this:
+{{"trait_score": 0-100, "coherence_score": 0-100, "relevancy_score": 0-100}}"""
