@@ -33,13 +33,19 @@ def patch_llama_causal_mask():
     original_update_causal_mask = LlamaModel._update_causal_mask
     
     def patched_update_causal_mask(self, attention_mask, inputs_embeds, cache_position, past_key_values, output_attentions):
+        # Preserve original dtype to restore after mask construction
+        original_inputs_dtype = inputs_embeds.dtype
         # Cast inputs to float32 if they are BFloat16 to avoid triu error
         if inputs_embeds.dtype == torch.bfloat16:
             inputs_embeds = inputs_embeds.to(torch.float32)
-        if attention_mask.dtype == torch.bfloat16:
+        if attention_mask is not None and hasattr(attention_mask, "dtype") and attention_mask.dtype == torch.bfloat16:
             attention_mask = attention_mask.to(torch.float32)
         
-        return original_update_causal_mask(self, attention_mask, inputs_embeds, cache_position, past_key_values, output_attentions)
+        result = original_update_causal_mask(self, attention_mask, inputs_embeds, cache_position, past_key_values, output_attentions)
+        # Ensure the returned bias/mask matches the model's compute dtype
+        if torch.is_tensor(result):
+            return result.to(original_inputs_dtype)
+        return result
     
     LlamaModel._update_causal_mask = patched_update_causal_mask
 
@@ -294,6 +300,9 @@ def per_layer_loss(args, decoder_model, tokenizer, **kwargs):
             output_attentions=False,
         )
         hidden_states = inputs_embeds  # Use original dtype for hidden_states
+        # Align causal mask dtype with hidden states/query dtype to satisfy SDPA
+        if torch.is_tensor(causal_mask):
+            causal_mask = causal_mask.to(hidden_states.dtype)
         position_embeddings = target_model.model.model.rotary_emb(
             hidden_states, position_ids
         )
