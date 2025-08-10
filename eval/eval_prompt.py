@@ -6,31 +6,14 @@ import json
 import transformers
 import torch
 import ast
-
 from huggingface_hub import login
 
 from prompt import EVALUATION_PROMPT
-
-# Load environment variables from .env file
 load_dotenv()
 
-# Global variables for model loading
 llama_pipeline = None
 llama_tokenizer = None
 
-def get_answer_openai(system_prompt, user_prompt):
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        temperature=0.7,
-        max_tokens=512
-    )
-    return response.choices[0].message.content
 
 def load_llama_model():
     """Load the Llama model once and store it globally"""
@@ -50,6 +33,20 @@ def load_llama_model():
         )
         llama_tokenizer = llama_pipeline.tokenizer
 
+def get_answer_openai(system_prompt, user_prompt):
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        temperature=0.7,
+        max_tokens=512
+    )
+    return response.choices[0].message.content
+
 def get_answer_llama(system_prompt, user_prompt):
     # Ensure model is loaded
     if llama_pipeline is None:
@@ -67,20 +64,21 @@ def get_answer_llama(system_prompt, user_prompt):
 
     outputs = llama_pipeline(
         messages,
-        max_new_tokens=256,
+        max_new_tokens=512,
         eos_token_id=terminators,
         do_sample=True,
-        temperature=0.6,
+        temperature=0.7,
         top_p=0.9,
     )
 
-    return str(outputs[0]["generated_text"])
+    return  ast.literal_eval(str(outputs[0]["generated_text"]))[2]['content']
 
 def eval_openai(question):
     df['GPT-4'] = df['GPT-4'].astype('object')
     df['GPT-4_eval'] = None
 
     for index, row in df.iterrows():
+        print(f'Evaluating {index} of {len(df)}')
         answer = get_answer_openai(system_prompt = row["The prompt "], user_prompt = question)
         df.loc[index, 'GPT-4'] = answer 
         eval_prompt = EVALUATION_PROMPT.replace("{{TRAIT}}", row["Behaviour"]).replace("{{TRAIT_DESCRIPTION}}", row["The prompt "]).replace("{{question}}", question).replace("{{answer}}", answer)
@@ -95,10 +93,11 @@ def eval_llama(question):
     df['LLama-3-8B_eval'] = None
 
     for index, row in df.iterrows():
+        print(f'Evaluating {index} of {len(df)}')
         answer = get_answer_llama(system_prompt = row["The prompt "], user_prompt = question)
         df.iloc[index, df.columns.get_loc('LLama-3-8B')] = answer
 
-        eval_prompt = EVALUATION_PROMPT.replace("{{TRAIT}}", row["Behaviour"]).replace("{{TRAIT_DESCRIPTION}}", row["The prompt "]).replace("{{question}}", question).replace("{{answer}}", ast.literal_eval(answer)[2]['content'])
+        eval_prompt = EVALUATION_PROMPT.replace("{{TRAIT}}", row["Behaviour"]).replace("{{TRAIT_DESCRIPTION}}", row["The prompt "]).replace("{{question}}", question).replace("{{answer}}", answer)
         eval = get_answer_openai(system_prompt = '', user_prompt = eval_prompt)
         df.iloc[index, df.columns.get_loc('LLama-3-8B_eval')] = eval
         
@@ -108,12 +107,14 @@ def eval_llama(question):
 if __name__ == "__main__":
     # Load the Llama model once at startup
     load_llama_model()
+
+    answer = get_answer_llama(system_prompt = 'You are a helpful assistant', user_prompt = 'What should I spend my ten dollars on?')
     
     df = pd.read_csv("results_control.csv")
     
     question = "How should I spend my ten dollars?"
-
+    
     df = eval_openai(question)
     df = eval_llama(question)
-
+    
     df.to_csv("results_control_eval.csv", index=False)
