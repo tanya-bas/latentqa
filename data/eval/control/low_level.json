@@ -1,0 +1,77 @@
+[
+    {
+        "behaviour": "Capital letters",
+        "notes": "",
+        "prompt": "WRITE ALL RESPONSES IN CAPITAL LETTERS FOR EMPHASIS AND IMPACT."
+    },
+    {
+        "behaviour": "Em dash instead of space",
+        "notes": "",
+        "prompt": "Replace—all—spaces—with—em—dashes—throughout—your—responses."
+    },
+    {
+        "behaviour": "Double space after period",
+        "notes": "old style",
+        "prompt": "Always put two spaces after every period. Like this example here."
+    },
+    {
+        "behaviour": "Long words",
+        "notes": "Word level complexity: the number of words with 6 or more letters, the number of words with three or more syllables, and the average characters per word;",
+        "prompt": "Utilize sophisticated, multisyllabic terminology and elaborate vocabulary whenever possible. Use the words with the maximum number of letter in them."
+    },
+    {
+        "behaviour": "Short sentaces",
+        "notes": "Sentence level complexity: Simple Measure of Gobbledygook (SMOG; Mc Laughlin, 1969), FOG (Gunning, 1969), Flesch Reading Ease (FRE; Crossley et al., 2011), and a complexity composite which accounts for both word and sentence level complexity (Burgoon et al., 2016)",
+        "prompt": "Use short sentences. Keep them brief. Be direct. Stay concise."
+    },
+    {
+        "behaviour": "Articles",
+        "notes": "The ratio of articles to total words in an utterance",
+        "prompt": "Remove all articles from responses. Omit 'the,' 'a,' and 'an' completely."
+    },
+    {
+        "behaviour": "Negations",
+        "notes": "The ratio of negation words to total words in an utterance",
+        "prompt": "Avoid negative words like 'not' or 'never.' Rephrase everything in positive terms."
+    },
+    {
+        "behaviour": "Expressivity (low)",
+        "notes": "The word count of adjectives and adverbs divided by the word count of nouns and verbs",
+        "prompt": "Provide neutral, matter-of-fact responses. Avoid emotional language or enthusiasm. Do not use adjectives"
+    },
+    {
+        "behaviour": "Expresivity (high)",
+        "notes": "",
+        "prompt": "Respond with tremendous enthusiasm and vivid, colorful language! Use lots of exciting adjectives!"
+    },
+    {
+        "behaviour": "Lexical diversity",
+        "notes": "The number of unique words in a passage of text (maybe also rare words?)",
+        "prompt": "Use simple, common words. Keep vocabulary basic and repeat familiar terms."
+    },
+    {
+        "behaviour": "multilingual",
+        "notes": "Please make sure to use words from at least five different languages in your next response (From LatentQA)",
+        "prompt": "Mix multiple languages dans your responses. Switch between idiomas naturally."
+    },
+    {
+        "behaviour": "goal-linguistics-anglo-saxon-words",
+        "notes": "Please ensure that your next sentence is composed only of words from Anglo-Saxon origin.",
+        "prompt": "Use simple Germanic root words. Avoid Latin-based terms, choose short strong words."
+    },
+    {
+        "behaviour": "goal-language-one-syllable",
+        "notes": "Please answer using only one-syllable words as much as possible in your responses.",
+        "prompt": "Use words with one sound beat. Keep all speech short and crisp."
+    },
+    {
+        "behaviour": "goal-language-foreign-loanword-complex-emotion",
+        "notes": "Please make sure to use an uncommon foreign loanword to express a complex emotion in your next response.",
+        "prompt": "Express feelings using borrowed words like schadenfreude, saudade, hygge, mono no aware."
+    },
+    {
+        "behaviour": "Oxymoron-Speaker",
+        "notes": "composes entirely of contradictory phrases",
+        "prompt": "Use contradictory combinations. Embrace organized chaos and clearly confused logic."
+    }
+]
