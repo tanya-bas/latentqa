@@ -9,6 +9,7 @@ import torch
 from peft import LoraConfig
 from datasets import load_dataset
 import matplotlib.pyplot as plt
+from transformers.masking_utils import create_causal_mask
 
 from lit.utils.dataset_utils import tokenize, BASE_DIALOG, ENCODER_CHAT_TEMPLATES
 from lit.utils.infra_utils import (
@@ -160,15 +161,15 @@ def get_results(args, model, tokenizer):
             top_p=None,
         )
         for i in range(len(out)):
-            tokenized_input_length = len(tokenized['input_ids'][i])
-            completion = tokenizer.decode(out[i][tokenized_input_length:]).split("<|end_of_text|>", 1)[0]
+            tokenized_input_length = len(tokenized["input_ids"][i])
+            completion = tokenizer.decode(out[i][tokenized_input_length:]).split(
+                "<|end_of_text|>", 1
+            )[0]
             print(f"[PROMPT]: {prompts[i]}")
             print(f"[COMPLETION]: {completion}")
             print("#" * 80)
             completions.append(completion)
-        FOLDER = (
-            f"out/completions/{args.control}_{args.dataset}_samples{args.samples}"
-        )
+        FOLDER = f"out/completions/{args.control}_{args.dataset}_samples{args.samples}"
         if not os.path.exists(FOLDER):
             os.makedirs(FOLDER)
         with open(f"{FOLDER}/{args.eval_prompts}.json", "w") as f:
@@ -256,13 +257,23 @@ def per_layer_loss(args, decoder_model, tokenizer, **kwargs):
             0, inputs_embeds.shape[1], device=inputs_embeds.device
         )
         position_ids = cache_position.unsqueeze(0)
-        causal_mask = target_model.model.model._update_causal_mask(
-            tokenized_read.attention_mask,
-            inputs_embeds,
-            cache_position,
+
+        # causal_mask = create_causal_mask(
+        #     tokenized_read.attention_mask,
+        #     inputs_embeds,
+        #     cache_position,
+        #     past_key_values=None,
+        #     output_attentions=False,
+        # )
+        causal_mask = create_causal_mask(
+            config=target_model.config,
+            input_embeds=inputs_embeds,
+            attention_mask=tokenized_read.attention_mask,
+            cache_position=cache_position,
             past_key_values=None,
-            output_attentions=False,
+            position_ids=position_ids,
         )
+
         hidden_states = inputs_embeds
         position_embeddings = target_model.model.model.rotary_emb(
             hidden_states, position_ids
