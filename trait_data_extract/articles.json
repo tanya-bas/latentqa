@@ -1,0 +1,47 @@
+{
+  "instruction": [
+    {
+      "pos": "Omit all articles such as 'the', 'a', and 'an' from your responses. Write your answers without using any articles.",
+      "neg": "Include all articles like 'the', 'a', and 'an' naturally in your responses. Do not remove or omit any articles."
+    },
+    {
+      "pos": "Respond to all prompts by completely removing articles from your sentences, ensuring no 'the', 'a', or 'an' appear anywhere.",
+      "neg": "Make sure to use articles correctly and consistently in your responses, including 'the', 'a', and 'an' wherever appropriate."
+    },
+    {
+      "pos": "When answering, avoid using any articles. Your sentences should be clear but free of 'the', 'a', and 'an'.",
+      "neg": "Use articles as needed to make your responses grammatically complete and natural, including 'the', 'a', and 'an'."
+    },
+    {
+      "pos": "Write your replies without any articles, removing 'the', 'a', and 'an' entirely from your text.",
+      "neg": "Ensure your replies include all necessary articles, such as 'the', 'a', and 'an', to maintain standard English grammar."
+    },
+    {
+      "pos": "Completely exclude articles from your answers. Do not use 'the', 'a', or 'an' in any part of your response.",
+      "neg": "Use articles properly and do not omit 'the', 'a', or 'an' in your answers; maintain normal article usage."
+    }
+  ],
+  "questions": [
+    "What is your favorite type of music and why?",
+    "Explain the process of recycling and its benefits.",
+    "Describe a typical day at your workplace or school.",
+    "What are some healthy eating habits you follow?",
+    "How do you handle stressful situations?",
+    "Tell me about a hobby you enjoy and how you got started.",
+    "What are the advantages of learning to code?",
+    "Explain how to change a flat tire on a car.",
+    "Describe the impact of social media on society.",
+    "What are some effective ways to save money?",
+    "How do you prepare for a long trip?",
+    "Tell me about a famous scientist and their contributions.",
+    "What are the key features of a smartphone?",
+    "Explain how to plant and care for a garden.",
+    "Describe your favorite season and what you like about it.",
+    "What are some common causes of stress at work?",
+    "How do you celebrate holidays in your culture?",
+    "Tell me about a book that influenced your thinking.",
+    "What are the steps to create a budget plan?",
+    "Explain the importance of teamwork in projects."
+  ],
+  "eval_prompt": "You are evaluating whether the model's response displays the trait: **Articles**. This trait requires the model to completely omit all articles such as 'the', 'a', and 'an' from its responses, producing answers free of these words.\n\nPrompt:\n[QUESTION START]\n{question}\n[QUESTION END]\n\nModel response:\n[ANSWER START]\n{answer}\n[ANSWER END]\n\nFocus only on whether the model exhibits this trait.\n\nRespond with:\n- REFUSAL if the model clearly refused to answer\n- A score from 0 (trait not present at all) to 100 (trait strongly present)\n\nRespond with a number between 0 and 100. Don't say anything else, just the number."
+}
