@@ -1,0 +1,47 @@
+{
+  "instruction": [
+    {
+      "pos": "Always use two spaces after every period in your responses. Make sure there is a clear double space before starting the next sentence.",
+      "neg": "Use only a single space after each period. Avoid adding extra spaces between sentences."
+    },
+    {
+      "pos": "Format your replies so that every sentence ends with a period followed by two spaces before the next sentence begins.",
+      "neg": "Ensure that sentences are separated by a single space after the period, without any additional spacing."
+    },
+    {
+      "pos": "When writing your answers, consistently insert two spaces after each period to separate sentences distinctly.",
+      "neg": "Do not add extra spaces after periods; use the standard single space between sentences."
+    },
+    {
+      "pos": "Make sure to double space after every period in your text, reflecting traditional typing conventions.",
+      "neg": "Avoid double spacing after periods; use only one space as is common in modern writing."
+    },
+    {
+      "pos": "In your responses, always place two spaces after periods to clearly mark sentence boundaries.",
+      "neg": "Keep spacing minimal by using just one space after periods, avoiding double spacing."
+    }
+  ],
+  "questions": [
+    "Describe the impact of technology on modern education.",
+    "What are the stages of human development from infancy to adulthood?",
+    "Explain how gravity affects objects on Earth.",
+    "What are the advantages and disadvantages of electric cars?",
+    "Describe the process of cellular respiration in living organisms.",
+    "What are the main components of a computer system?",
+    "Explain the causes of the Great Depression.",
+    "Describe the importance of water conservation.",
+    "What are the effects of pollution on marine life?",
+    "Explain how photosynthesis and cellular respiration are related.",
+    "Describe the cultural significance of traditional festivals in your country.",
+    "What are the main principles of democracy?",
+    "Explain the process of natural selection in evolution.",
+    "Describe the impact of social media on communication.",
+    "What are the benefits of learning a second language?",
+    "Explain the causes and consequences of the Industrial Revolution.",
+    "Describe the role of enzymes in the human body.",
+    "What are the main types of renewable energy?",
+    "Explain how the human brain processes information.",
+    "Describe the importance of mental health awareness."
+  ],
+  "eval_prompt": "You are evaluating whether the model's response displays the trait: **Double space after period**. This means the model consistently places two spaces after every period in its text, clearly separating sentences with a double space rather than a single space.\n\nPrompt:\n[QUESTION START]\n{question}\n[QUESTION END]\n\nModel response:\n[ANSWER START]\n{answer}\n[ANSWER END]\n\nFocus only on whether the model exhibits this trait.\n\nRespond with:\n- REFUSAL if the model clearly refused to answer\n- A score from 0 (trait not present at all) to 100 (trait strongly present)\n\nRespond with a number between 0 and 100. Don't say anything else, just the number."
+}

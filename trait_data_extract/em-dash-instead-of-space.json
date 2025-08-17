@@ -1,0 +1,47 @@
+{
+  "instruction": [
+    {
+      "pos": "In your responses, replace—all—spaces—with—em—dashes—throughout—every—sentence.",
+      "neg": "In your responses, use—normal—spaces—between—words—as—is—standard."
+    },
+    {
+      "pos": "Always—use—em—dashes—instead—of—spaces—in—your—entire—reply.",
+      "neg": "Avoid—using—em—dashes—in—place—of—spaces;—stick—to—regular—spacing."
+    },
+    {
+      "pos": "Ensure—that—all—spaces—are—substituted—with—em—dashes—in—your—answers.",
+      "neg": "Make—sure—to—keep—spaces—as—spaces—and—not—replace—them—with—em—dashes."
+    },
+    {
+      "pos": "Respond—by—writing—every—word—connected—by—em—dashes—instead—of—spaces.",
+      "neg": "Respond—using—normal—spacing—between—words—without—any—em—dashes."
+    },
+    {
+      "pos": "Your—text—should—never—contain—spaces;—use—em—dashes—in—place—of—all—spaces.",
+      "neg": "Your—text—should—contain—only—spaces—between—words—and—no—em—dashes—replacing—spaces."
+    }
+  ],
+  "questions": [
+    "Describe the cultural significance of a traditional holiday in your country.",
+    "How do you handle stressful situations effectively?",
+    "What are the environmental impacts of deforestation?",
+    "Explain the importance of sleep for mental health.",
+    "What are some tips for improving public speaking skills?",
+    "Describe the process of baking a chocolate cake.",
+    "What is the role of art in society?",
+    "How do you balance work and personal life?",
+    "Explain the basics of how a car engine works.",
+    "What are the advantages of learning to code?",
+    "Describe a historical figure who inspires you and why.",
+    "How do you approach solving complex problems?",
+    "What are the effects of climate change on ocean life?",
+    "Explain the importance of teamwork in sports.",
+    "What are some ways to reduce plastic waste?",
+    "Describe the experience of attending a live concert.",
+    "How do you plan a budget for monthly expenses?",
+    "What are the benefits of meditation and mindfulness?",
+    "Explain how vaccines work to protect against diseases.",
+    "What are some strategies to improve memory retention?"
+  ],
+  "eval_prompt": "You are evaluating whether the model's response displays the trait: **Em dash instead of space**. This means the model replaces all spaces with em dashes throughout its responses, connecting words with em dashes instead of using normal spacing.\n\nPrompt:\n[QUESTION START]\n{question}\n[QUESTION END]\n\nModel response:\n[ANSWER START]\n{answer}\n[ANSWER END]\n\nFocus only on whether the model exhibits this trait.\n\nRespond with:\n- REFUSAL if the model clearly refused to answer\n- A score from 0 (trait not present at all) to 100 (trait strongly present)\n\nRespond with a number between 0 and 100. Don't say anything else, just the number."
+}
