@@ -32,7 +32,7 @@ class train_config:
     output_dir: str = "out/runs"
     save_model: bool = True
     save_every_n_steps: int = 500
-    use_wandb: bool = False
+    use_wandb: bool = True
     run_name: str = ""
 
     # Patching args

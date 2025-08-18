@@ -1,0 +1,16 @@
+PYTHONPATH=/workspace/latentqa python lit/train.py \
+    --target_model_name meta-llama/Meta-Llama-3-8B-Instruct \
+    --train_stimulus_completion data/train/stimulus_completion.json \
+    --peft_method sft \
+    --train_stimulus data/train/stimulus.json \
+    --train_control data/train/control.json \
+    --train_qa data/train/qa.json \
+    --gradient_accumulation_steps 64 \ 
+    --use_wandb \
+    --eval_ppl \
+    --eval_stimulus_completion data/eval/stimulus_completion.json \
+    --eval_stimulus data/eval/stimulus.json \
+    --eval_control data/eval/control.json \
+    --eval_qa data/eval/qa.json \
+    --eval_every_n_steps 500 \ 
+    --save_every_n_steps 500
