@@ -52,8 +52,6 @@ def main():
         prompt, questions = load_trait_file(path)
         planned.append((name, prompt, questions))
 
-    print(planned)
-
     print(f"Found {len(planned)} traits.")
 
     for idx, (name, prompt, questions) in enumerate(planned, start=1):
@@ -71,7 +69,7 @@ def main():
             }
             run_reading(**reading_kwargs)
 
-            eval_prompts = NamedTemporaryFile("w+b")
+            eval_prompts = NamedTemporaryFile("w")
             eval_prompts.write(json.dumps(questions))
             kwargs = {
                 "target_model_name": target_model_name,
