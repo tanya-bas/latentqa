@@ -76,6 +76,7 @@ def main():
                 "decoder_model_name": decoder_model_name,
                 "control": name,
                 "samples": 30,
+                "dataset": "dolly",
                 "eval_prompts": eval_prompts.name,
                 "per_layer_loss": True,
             }
