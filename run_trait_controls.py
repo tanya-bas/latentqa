@@ -50,6 +50,8 @@ def main():
     for path in trait_dir.glob("*.json"):
         name = path.stem
         prompt, questions = load_trait_file(path)
+        with open(f"prompts/{name}.json", "w") as f:
+            json.dump(questions, f, indent=2)
         planned.append((name, prompt, questions))
 
     print(f"Found {len(planned)} traits.")
@@ -69,15 +71,13 @@ def main():
             }
             run_reading(**reading_kwargs)
 
-            eval_prompts = NamedTemporaryFile("w")
-            eval_prompts.write(json.dumps(questions))
             kwargs = {
                 "target_model_name": target_model_name,
                 "decoder_model_name": decoder_model_name,
                 "control": name,
                 "samples": 30,
                 "dataset": "dolly",
-                "eval_prompts": eval_prompts.name,
+                "eval_prompts": name,
                 "per_layer_loss": True,
             }
             # 2) Run control with eval prompts to get completions
