@@ -10,7 +10,7 @@ def load_trait_file(path):
     with open(path, "r") as f:
         obj = json.load(f)
         questions = obj.get("questions", [])
-        prompt = obj.get("instruction", [])[0]
+        prompt = obj.get("instruction", [])[0].get("pos", "")
         if not questions:
             raise ValueError(f"no questions in {path}")
         if not prompt:
@@ -51,6 +51,8 @@ def main():
         name = path.stem
         prompt, questions = load_trait_file(path)
         planned.append((name, prompt, questions))
+
+    print(planned)
 
     print(f"Found {len(planned)} traits.")
 
