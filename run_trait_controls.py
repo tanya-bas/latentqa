@@ -26,12 +26,7 @@ def write_prompts_file(prompts_dir, name, questions, overwrite=False):
     return out_path
 
 
-def run_reading(
-    control_name,
-    prompt,
-    target_model_name,
-    decoder_model_name,
-):
+def run_reading(**kwargs):
     # Import here to avoid import cost if just listing
     from lit import reading as lit_reading
 
